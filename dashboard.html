@@ -1,0 +1,559 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Company A — Management Dashboard</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    theme: {
+      extend: {
+        fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+        colors: {
+          positive: '#16a34a',
+          negative: '#dc2626',
+          warning: '#f59e0b',
+          brand: '#1e3a8a',
+        }
+      }
+    }
+  }
+</script>
+<style>
+  html, body { font-family: 'Inter', system-ui, sans-serif; }
+  .tabular-nums { font-variant-numeric: tabular-nums; }
+  body { background: #f8fafc; color: #0f172a; }
+  .dark body { background: #0b1220; color: #e2e8f0; }
+  .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 0.75rem; box-shadow: 0 1px 2px 0 rgba(0,0,0,.04); }
+  .dark .card { background: #0f172a; border-color: #1e293b; }
+  .muted { color: #64748b; }
+  .dark .muted { color: #94a3b8; }
+  table.tbl { width: 100%; font-size: 13px; }
+  table.tbl th { text-transform: uppercase; font-size: 11px; letter-spacing: .05em; color: #64748b; font-weight: 500; text-align: left; padding: 10px 12px; border-bottom: 1px solid #e2e8f0; }
+  table.tbl td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; }
+  .dark table.tbl th { color:#94a3b8; border-color:#1e293b; }
+  .dark table.tbl td { border-color:#1e293b; }
+  table.tbl tr:hover td { background: rgba(241,245,249,.6); }
+  .dark table.tbl tr:hover td { background: rgba(30,41,59,.4); }
+  .bold-row td { background: #f1f5f9; font-weight: 600; }
+  .dark .bold-row td { background: #1e293b; }
+  .total-row td { background: #e2e8f0; font-weight: 700; }
+  .dark .total-row td { background: #334155; }
+  select { font: inherit; }
+  .badge { display:inline-flex; align-items:center; gap:4px; font-size:12px; font-weight:600; }
+  .pos { color:#16a34a; } .neg { color:#dc2626; } .zero { color:#64748b; }
+</style>
+</head>
+<body>
+<div id="app" class="max-w-[1400px] mx-auto px-6 py-8">
+
+  <!-- HEADER -->
+  <header class="flex items-start justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold">Management Dashboard</h1>
+      <p class="text-sm muted mt-1">1Q 2026 (Jan–Mar 2026) · 17 properties · 1.30M sqft GFA · As of 31 March 2026</p>
+    </div>
+    <button id="themeToggle" class="p-2 rounded-md border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition" aria-label="Toggle theme">
+      <i data-lucide="moon" class="h-4 w-4 hidden dark:inline"></i>
+      <i data-lucide="sun" class="h-4 w-4 inline dark:hidden"></i>
+    </button>
+  </header>
+
+  <!-- SECTION 1 -->
+  <div class="flex items-center gap-3 mt-8 mb-4">
+    <span class="text-xs muted tabular-nums">1</span>
+    <h2 class="text-sm font-semibold tracking-wider uppercase">Executive Summary</h2>
+  </div>
+  <div id="kpiTop" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"></div>
+  <div id="kpiBottom" class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4"></div>
+
+  <!-- SECTION 2 -->
+  <div class="flex items-center gap-3 mt-10 mb-4">
+    <span class="text-xs muted tabular-nums">2</span>
+    <h2 class="text-sm font-semibold tracking-wider uppercase">Property Performance</h2>
+  </div>
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div class="card">
+      <div class="px-6 pt-5 pb-2 flex items-center justify-between">
+        <div class="font-semibold">Profit &amp; Loss <span class="text-xs muted font-normal">(HK$M)</span></div>
+      </div>
+      <div class="px-2 pb-4"><div id="pnlTable"></div></div>
+    </div>
+
+    <div class="card">
+      <div class="px-6 pt-5 pb-2 font-semibold">Profit &amp; Loss (By Property) <span class="text-xs muted font-normal">(HK$M)</span></div>
+      <div class="px-2 pb-4"><div id="pnlPropTable"></div></div>
+      <p class="text-xs muted px-6 pb-4">NPI = Revenue − OPEX. BME (Building Management Expenses) shown for information only and is not deducted in NPI.</p>
+    </div>
+
+    <div class="card">
+      <div class="px-6 pt-5 pb-2 font-semibold">BME Breakdown <span class="text-xs muted font-normal">(By Items — Overall, HK$M)</span></div>
+      <div class="px-2 pb-4"><div id="bmeItemsTable"></div></div>
+    </div>
+
+    <div class="card">
+      <div class="px-6 pt-5 pb-2 flex items-center justify-between">
+        <div class="font-semibold">BME Breakdown <span class="text-xs muted font-normal">(By Property and By Items)</span></div>
+        <select id="bmeSelect" class="border border-slate-200 dark:border-slate-700 rounded-md px-2 py-1 text-sm bg-transparent">
+          <option>Electricity</option><option>Staff Cost</option><option>Security</option>
+        </select>
+      </div>
+      <div class="px-6 pb-6"><canvas id="bmeChart" height="240"></canvas></div>
+    </div>
+  </div>
+
+  <!-- SECTION 3 -->
+  <div class="flex items-center gap-3 mt-10 mb-4">
+    <span class="text-xs muted tabular-nums">3</span>
+    <h2 class="text-sm font-semibold tracking-wider uppercase">Occupancy and Lease Expiry</h2>
+  </div>
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div class="card">
+      <div class="px-6 pt-5 pb-2 font-semibold">Occupancy Expiry Profile — Occupancy</div>
+      <div class="px-2 pb-4"><div id="occTable"></div></div>
+    </div>
+    <div class="grid grid-rows-2 gap-4">
+      <div class="card">
+        <div class="px-6 pt-5 pb-2 font-semibold">Expiry Profile</div>
+        <div class="px-6 pb-6"><canvas id="expiryChart" height="200"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="px-6 pt-5 pb-2 font-semibold">Rental Reversion</div>
+        <div class="px-6 pb-6"><canvas id="reversionChart" height="200"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 4 -->
+  <div class="flex items-center gap-3 mt-10 mb-4">
+    <span class="text-xs muted tabular-nums">4</span>
+    <h2 class="text-sm font-semibold tracking-wider uppercase">Net Property Income</h2>
+  </div>
+  <div class="card">
+    <div class="px-6 pt-5 pb-2 flex items-start justify-between">
+      <div>
+        <div class="font-semibold">NPI Trend</div>
+        <p class="text-xs muted mt-1">Half-yearly · FY 2024 – FY 2026 · Portfolio</p>
+      </div>
+      <div class="text-right">
+        <p class="text-xs uppercase muted">FY26 NPI YOY</p>
+        <p class="text-lg font-bold neg">-1.1%</p>
+      </div>
+    </div>
+    <div class="px-6 pb-6"><canvas id="npiChart" height="100"></canvas></div>
+  </div>
+
+  <!-- SECTION 5 -->
+  <div class="flex items-center gap-3 mt-10 mb-4">
+    <span class="text-xs muted tabular-nums">5</span>
+    <h2 class="text-sm font-semibold tracking-wider uppercase">Tenant Sales Performance</h2>
+  </div>
+  <div class="card">
+    <div class="px-6 pt-5 pb-2 flex items-center justify-between">
+      <div class="font-semibold">Tenant Sales Performance</div>
+      <div class="flex items-center gap-2">
+        <span class="text-xs uppercase muted">Trade Category</span>
+        <select id="tenantSelect" class="border border-slate-200 dark:border-slate-700 rounded-md px-2 py-1 text-sm bg-transparent">
+          <option>Apparel &amp; Shoes</option><option>F&amp;B</option><option>Beauty &amp; Health</option>
+        </select>
+      </div>
+    </div>
+    <div class="px-2 pb-4"><div id="tenantTable"></div></div>
+    <p class="text-xs muted px-6 pb-4">Sales figures are at the tenant level for the selected trade category. R/S ratio = rent paid divided by tenant sales for the period.</p>
+  </div>
+
+  <footer class="mt-12 pt-6 border-t border-slate-200 dark:border-slate-700 text-xs muted">
+    Source: Company A internal Leasing Statistics 1Q 2026 workbook · HKD in thousands unless stated · 1Q 2026 = Jan–Mar 2026
+  </footer>
+</div>
+
+<script>
+/* ---------- DATA ---------- */
+const data = {
+  pnl: [
+    { item:"Rental and carpark income", actual:121.48, budget:118.63, varPct:2.4 },
+    { item:"Rental related income", actual:28.76, budget:29.29, varPct:-1.8 },
+    { item:"Total revenue", actual:150.24, budget:147.92, varPct:1.6, bold:true },
+    { item:"Building management fee", actual:-14.67, budget:-13.94, varPct:-5.2 },
+    { item:"Marketing and promotion", actual:-0.32, budget:-0.33, varPct:2.4 },
+    { item:"Maintenance and repair", actual:-0.23, budget:-0.22, varPct:-3.7 },
+    { item:"Rental commission", actual:-1.33, budget:-1.41, varPct:5.8 },
+    { item:"Other OPEX", actual:-11.83, budget:-11.81, varPct:-0.2 },
+  ],
+  pnlProp: [
+    { p:"Property 1", r:33.30, o:-5.63, b:-2.91, n:27.6 },
+    { p:"Property 5", r:32.74, o:-5.34, b:-2.76, n:27.4 },
+    { p:"Property 6", r:16.33, o:-2.97, b:-1.53, n:13.3 },
+    { p:"Property 2", r:9.46,  o:-1.55, b:-0.80, n:7.9 },
+    { p:"Property 7", r:9.13,  o:-1.55, b:-0.80, n:7.5 },
+    { p:"Property 3", r:7.80,  o:-1.39, b:-0.72, n:6.4 },
+    { p:"Property 8", r:7.22,  o:-1.31, b:-0.68, n:5.9 },
+    { p:"Property 17",r:6.03,  o:-1.13, b:-0.58, n:4.9 },
+  ],
+  bmeItems: [
+    { i:"Electricity", ytd:3.15, vb:3.4, yp:8.7, yd:0.27 },
+    { i:"Staff Cost", ytd:4.18, vb:-1.8, yp:-2.4, yd:-0.10 },
+    { i:"Security", ytd:1.61, vb:2.7, yp:5.2, yd:0.08 },
+    { i:"Other BME items", ytd:5.72, vb:1.5, yp:3.0, yd:0.17 },
+    { i:"Total BME", ytd:14.67, vb:1.1, yp:3.0, yd:0.43, bold:true },
+  ],
+  bmeByProp: {
+    "Electricity": [
+      { p:"Property 4", v:-12 }, { p:"Property 6", v:-10 },
+      { p:"Property 2", v:-6 },  { p:"Property 8", v:-4 },
+      { p:"Property 7", v:5 },   { p:"Property 1", v:9 },
+      { p:"Property 5", v:11 },  { p:"Property 3", v:15 },
+      { p:"Other Properties", v:1 },
+    ],
+    "Staff Cost": [
+      { p:"Property 4", v:-6 }, { p:"Property 6", v:-4 },
+      { p:"Property 2", v:-2 }, { p:"Property 8", v:-1 },
+      { p:"Property 7", v:2 },  { p:"Property 1", v:3 },
+      { p:"Property 5", v:5 },  { p:"Property 3", v:6 },
+      { p:"Other Properties", v:-1 },
+    ],
+    "Security": [
+      { p:"Property 4", v:-4 }, { p:"Property 6", v:-3 },
+      { p:"Property 2", v:-1 }, { p:"Property 8", v:0 },
+      { p:"Property 7", v:3 },  { p:"Property 1", v:4 },
+      { p:"Property 5", v:6 },  { p:"Property 3", v:8 },
+      { p:"Other Properties", v:1 },
+    ],
+  },
+  occPeriods: ["DEC-25","MAR-26","JUN-26","SEP-26"],
+  occ: [
+    { p:"Property 1", seg:"office", v:[95.7,94.5,95.1,94.6] },
+    { p:"Property 2", seg:"office", v:[92.4,91.2,91.8,91.3] },
+    { p:"Property 3", seg:"office", v:[97.9,96.7,97.3,96.8] },
+    { p:"Property 9", seg:"office", v:[90.1,88.9,89.5,89.0] },
+    { p:"Property 10", seg:"office", v:[91.3,90.1,90.7,90.2] },
+    { p:"Property 4", seg:"office", v:[94.6,93.4,94.0,93.5] },
+    { p:"Property 11", seg:"office", v:[88.8,87.6,88.2,87.7] },
+    { p:"Property 12", seg:"office", v:[93.7,92.5,93.1,92.6] },
+    { p:"Property 13", seg:"office", v:[89.4,88.2,88.8,88.3] },
+    { p:"Property 14", seg:"office", v:[96.0,94.8,95.4,94.9] },
+    { p:"Property 15", seg:"office", v:[93.0,91.8,92.4,91.9] },
+    { p:"Office Average", seg:"sub", v:[94.1,92.9,93.5,93.0] },
+    { p:"Property 5", seg:"retail", v:[97.5,96.5,95.8,95.5] },
+    { p:"Property 6", seg:"retail", v:[93.8,92.8,92.1,91.8] },
+    { p:"Property 7", seg:"retail", v:[95.3,94.3,93.6,93.3] },
+    { p:"Property 8", seg:"retail", v:[91.6,90.6,89.9,89.6] },
+    { p:"Property 16", seg:"retail", v:[89.1,88.1,87.4,87.1] },
+    { p:"Property 17", seg:"retail", v:[96.4,95.4,94.7,94.4] },
+    { p:"Retail Average", seg:"sub", v:[94.9,94.0,93.3,93.0] },
+    { p:"Overall Occupancy", seg:"total", v:[94.4,93.3,93.5,93.0] },
+  ],
+  expiry: [
+    { p:"Property 1", a:20, b:6, c:14 },
+    { p:"Property 2", a:8,  b:9, c:7 },
+    { p:"Property 3", a:14, b:5, c:14 },
+    { p:"Property 4", a:6,  b:3, c:16 },
+    { p:"Property 5", a:20, b:12,c:7 },
+    { p:"Property 6", a:10, b:11,c:9 },
+    { p:"Property 7", a:16, b:5, c:14 },
+    { p:"Property 8", a:7,  b:11,c:7 },
+  ],
+  reversion: [
+    { p:"Property 8", v:-7.8 }, { p:"Property 7", v:-6.4 },
+    { p:"Property 3", v:-4.2 }, { p:"Property 2", v:-3.1 },
+    { p:"Property 6", v:-2.4 }, { p:"Property 4", v:-1.3 },
+    { p:"Property 1", v:4.3 },  { p:"Property 5", v:6.5 },
+  ],
+  npi: [
+    { x:"FY24 H1", y:275 }, { x:"FY24 H2", y:258 },
+    { x:"FY25 H1", y:248 }, { x:"FY25 H2", y:240 },
+    { x:"FY26 H1", y:245 }, { x:"FY26 H2", y:235 },
+  ],
+  tenants: {
+    "Apparel & Shoes": [
+      { n:"Tenant A", c:15.67, pr:15.10, y:3.8, cr:15.2, prr:15.4 },
+      { n:"Tenant B", c:16.68, pr:13.98, y:19.3, cr:21.3, prr:23.0 },
+      { n:"Tenant C", c:6.78,  pr:6.67,  y:1.6, cr:16.8, prr:16.6 },
+      { n:"Tenant D", c:8.44,  pr:7.69,  y:9.8, cr:16.9, prr:16.2 },
+      { n:"Tenant E", c:8.25,  pr:9.22,  y:-10.5,cr:20.0, prr:21.8 },
+    ],
+    "F&B": [
+      { n:"Tenant F", c:22.10, pr:19.80, y:11.6, cr:12.4, prr:13.1 },
+      { n:"Tenant G", c:14.50, pr:15.20, y:-4.6, cr:14.8, prr:14.2 },
+      { n:"Tenant H", c:9.20,  pr:8.40,  y:9.5,  cr:11.2, prr:11.5 },
+    ],
+    "Beauty & Health": [
+      { n:"Tenant I", c:11.30, pr:10.40, y:8.7, cr:18.5, prr:19.0 },
+      { n:"Tenant J", c:7.80,  pr:7.10,  y:9.9, cr:17.2, prr:17.6 },
+    ],
+  }
+};
+
+/* ---------- HELPERS ---------- */
+const fmt = (n, d=2) => (n>=0?'':'-') + Math.abs(n).toFixed(d);
+const sign = (n) => n>0 ? 'pos' : (n<0 ? 'neg' : 'zero');
+const signInv = (n) => n>0 ? 'neg' : (n<0 ? 'pos' : 'zero');
+const arrow = (n) => n>0 ? '▲' : (n<0 ? '▼' : '–');
+
+/* ---------- KPI CARDS ---------- */
+function kpiCard({label, value, budget, vsBgt, yoy, vsSuffix='%', yoySuffix='%', inverse=false}) {
+  const vsCls = inverse ? signInv(vsBgt) : sign(vsBgt);
+  const yoyCls = inverse ? signInv(yoy) : sign(yoy);
+  return `
+    <div class="card p-5">
+      <p class="text-xs uppercase tracking-wider muted">${label}</p>
+      <p class="text-3xl font-bold mt-2">${value}</p>
+      ${budget ? `<p class="text-xs muted mt-1">Budget ${budget}</p>` : ''}
+      <div class="flex gap-4 mt-3 text-xs">
+        ${vsBgt!==undefined ? `<span class="muted">VS BGT <span class="font-semibold ${vsCls}">${vsBgt>0?'+':''}${vsBgt.toFixed(1)}${vsSuffix}</span></span>` : ''}
+        ${yoy!==undefined ? `<span class="muted">YOY <span class="font-semibold ${yoyCls}">${arrow(yoy)} ${Math.abs(yoy).toFixed(1)}${yoySuffix}</span></span>` : ''}
+      </div>
+    </div>`;
+}
+
+document.getElementById('kpiTop').innerHTML = [
+  kpiCard({ label:"Total Revenue", value:"HK$150.2M", budget:"HK$147.9M", vsBgt:1.6, yoy:-0.8 }),
+  kpiCard({ label:"Operating Expenses", value:"HK$28.4M", budget:"HK$27.7M", vsBgt:-2.4, yoy:2.7, inverse:true }),
+  kpiCard({ label:"Net Property Income", value:"HK$121.9M", budget:"HK$120.2M", vsBgt:1.4, yoy:-1.5 }),
+  kpiCard({ label:"Cost-to-Income", value:"18.9%", budget:"18.7%", vsBgt:0.2, yoy:1.9, vsSuffix:'pp', yoySuffix:'pp', inverse:true }),
+].join('');
+
+document.getElementById('kpiBottom').innerHTML = `
+  <div class="card p-5">
+    <p class="text-xs uppercase tracking-wider muted">Overall Occupancy</p>
+    <p class="text-3xl font-bold mt-2">93.3%</p>
+    <p class="text-xs muted mt-1">Budget 95.0%</p>
+    <div class="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+      <div><p class="text-xs uppercase muted">New Lets</p><p class="font-bold text-lg">64 <span class="font-normal text-xs muted">21,427 sqft</span></p></div>
+      <div><p class="text-xs uppercase muted">Renewals</p><p class="font-bold text-lg">123 <span class="font-normal text-xs muted">74,627 sqft</span></p></div>
+    </div>
+  </div>
+  <div class="card p-5">
+    <p class="text-xs uppercase tracking-wider muted">Office</p>
+    <div class="grid grid-cols-2 gap-2 mt-2">
+      <div><p class="text-xs muted">Occupancy</p><p class="text-2xl font-bold">92.9%</p></div>
+      <div><p class="text-xs muted">Reversion</p><p class="text-2xl font-bold neg">-1.0%</p></div>
+    </div>
+    <div class="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+      <div><p class="text-xs uppercase muted">New Lets</p><p class="font-bold text-lg">32 <span class="text-xs muted font-normal">10,923 sqft</span></p></div>
+      <div><p class="text-xs uppercase muted">Renewals</p><p class="font-bold text-lg">74 <span class="text-xs muted font-normal">45,295 sqft</span></p></div>
+    </div>
+  </div>
+  <div class="card p-5">
+    <p class="text-xs uppercase tracking-wider muted">Retail</p>
+    <div class="grid grid-cols-2 gap-2 mt-2">
+      <div><p class="text-xs muted">Occupancy</p><p class="text-2xl font-bold">94.0%</p></div>
+      <div><p class="text-xs muted">Reversion</p><p class="text-2xl font-bold neg">-0.5%</p></div>
+    </div>
+    <div class="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+      <div><p class="text-xs uppercase muted">New Lets</p><p class="font-bold text-lg">32 <span class="text-xs muted font-normal">10,504 sqft</span></p></div>
+      <div><p class="text-xs uppercase muted">Renewals</p><p class="font-bold text-lg">49 <span class="text-xs muted font-normal">29,332 sqft</span></p></div>
+    </div>
+  </div>`;
+
+/* ---------- TABLES ---------- */
+function renderPnl() {
+  const rows = data.pnl.map(r => `
+    <tr class="${r.bold?'bold-row':''}">
+      <td>${r.item}</td>
+      <td class="text-right tabular-nums">${fmt(r.actual)}</td>
+      <td class="text-right tabular-nums">${fmt(r.budget)}</td>
+      <td class="text-right tabular-nums font-medium ${sign(r.varPct)}">${r.varPct>0?'+':''}${r.varPct.toFixed(1)}</td>
+    </tr>`).join('');
+  document.getElementById('pnlTable').innerHTML = `
+    <table class="tbl">
+      <thead><tr><th>Line Item</th><th class="text-right">Actual</th><th class="text-right">Budget</th><th class="text-right">Var %</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+function renderPnlProp() {
+  const rows = data.pnlProp.map(r => `
+    <tr>
+      <td>${r.p}</td>
+      <td class="text-right tabular-nums">${r.r.toFixed(2)}</td>
+      <td class="text-right tabular-nums neg">${r.o.toFixed(2)}</td>
+      <td class="text-right tabular-nums neg">${r.b.toFixed(2)}</td>
+      <td class="text-right tabular-nums font-medium">${r.n.toFixed(1)}</td>
+    </tr>`).join('');
+  document.getElementById('pnlPropTable').innerHTML = `
+    <table class="tbl">
+      <thead><tr><th>Property</th><th class="text-right">Revenue</th><th class="text-right">OPEX</th><th class="text-right">BME</th><th class="text-right">NPI</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+function renderBmeItems() {
+  const rows = data.bmeItems.map(r => `
+    <tr class="${r.bold?'bold-row':''}">
+      <td>${r.i}</td>
+      <td class="text-right tabular-nums">${r.ytd.toFixed(2)}</td>
+      <td class="text-right tabular-nums ${signInv(r.vb)}">${r.vb>0?'+':''}${r.vb.toFixed(1)}%</td>
+      <td class="text-right tabular-nums ${signInv(r.yp)}">${r.yp>0?'+':''}${r.yp.toFixed(1)}%</td>
+      <td class="text-right tabular-nums ${signInv(r.yd)}">${r.yd>0?'+':''}${r.yd.toFixed(2)}</td>
+    </tr>`).join('');
+  document.getElementById('bmeItemsTable').innerHTML = `
+    <table class="tbl">
+      <thead><tr><th>Item</th><th class="text-right">YTD</th><th class="text-right">VS Budget</th><th class="text-right">YOY %</th><th class="text-right">YOY $</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+function renderOcc() {
+  const periods = data.occPeriods;
+  const head = `<tr><th>Property</th>${periods.map(p=>`<th class="text-right">${p}</th>`).join('')}</tr>`;
+  const rows = data.occ.map(r => {
+    const cls = r.seg==='sub' ? 'bold-row' : (r.seg==='total' ? 'total-row' : '');
+    const cells = r.v.map(v => {
+      const low = (r.seg==='office'||r.seg==='retail') && v<90;
+      return `<td class="text-right tabular-nums ${low?'neg font-semibold':''}">${v.toFixed(1)}%</td>`;
+    }).join('');
+    return `<tr class="${cls}"><td>${r.p}</td>${cells}</tr>`;
+  }).join('');
+  document.getElementById('occTable').innerHTML = `<table class="tbl"><thead>${head}</thead><tbody>${rows}</tbody></table>`;
+}
+function renderTenants(cat) {
+  const rows = data.tenants[cat];
+  const sumC = rows.reduce((a,r)=>a+r.c,0);
+  const sumP = rows.reduce((a,r)=>a+r.pr,0);
+  const yTot = ((sumC-sumP)/sumP)*100;
+  const body = rows.map(r=>`
+    <tr>
+      <td>${r.n}</td>
+      <td class="text-right tabular-nums">HK$${r.c.toFixed(2)}M</td>
+      <td class="text-right tabular-nums">HK$${r.pr.toFixed(2)}M</td>
+      <td class="text-right tabular-nums font-medium ${sign(r.y)}">${r.y>0?'+':''}${r.y.toFixed(1)}%</td>
+      <td class="text-right tabular-nums">${r.cr.toFixed(1)}%</td>
+      <td class="text-right tabular-nums">${r.prr.toFixed(1)}%</td>
+    </tr>`).join('');
+  const total = `
+    <tr class="total-row">
+      <td>Category Total</td>
+      <td class="text-right tabular-nums">HK$${sumC.toFixed(2)}M</td>
+      <td class="text-right tabular-nums">HK$${sumP.toFixed(2)}M</td>
+      <td class="text-right tabular-nums ${sign(yTot)}">${yTot>0?'+':''}${yTot.toFixed(1)}%</td>
+      <td class="text-right tabular-nums">—</td>
+      <td class="text-right tabular-nums">—</td>
+    </tr>`;
+  document.getElementById('tenantTable').innerHTML = `
+    <table class="tbl">
+      <thead><tr>
+        <th>Trade Name</th><th class="text-right">Current Period Sales</th>
+        <th class="text-right">Prior Period Sales</th><th class="text-right">YOY %</th>
+        <th class="text-right">Current R/S Ratio</th><th class="text-right">Prior R/S Ratio</th>
+      </tr></thead>
+      <tbody>${body}${total}</tbody>
+    </table>`;
+}
+
+/* ---------- CHARTS ---------- */
+let bmeChart, expiryChart, reversionChart, npiChart;
+
+function gridColor(){ return document.documentElement.classList.contains('dark') ? '#1e293b' : '#e2e8f0'; }
+function tickColor(){ return document.documentElement.classList.contains('dark') ? '#94a3b8' : '#64748b'; }
+
+function renderBmeChart(item){
+  const rows = data.bmeByProp[item];
+  const labels = rows.map(r=>r.p);
+  const values = rows.map(r=>r.v);
+  const colors = values.map(v => v<0 ? '#16a34a' : '#dc2626');
+  if (bmeChart) bmeChart.destroy();
+  bmeChart = new Chart(document.getElementById('bmeChart'), {
+    type:'bar',
+    data:{ labels, datasets:[{ data:values, backgroundColor:colors, borderRadius:4 }] },
+    options:{
+      indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label:(c)=>`${c.parsed.x}%` } } },
+      scales:{
+        x:{ min:-16, max:16, ticks:{ stepSize:8, color:tickColor(), callback:v=>v+'%' }, grid:{ color:gridColor() } },
+        y:{ ticks:{ color:tickColor() }, grid:{ display:false } }
+      }
+    }
+  });
+}
+function renderExpiry(){
+  const labels = data.expiry.map(r=>r.p);
+  if (expiryChart) expiryChart.destroy();
+  expiryChart = new Chart(document.getElementById('expiryChart'), {
+    type:'bar',
+    data:{
+      labels,
+      datasets:[
+        { label:'Due in 1-3 months', data:data.expiry.map(r=>r.a), backgroundColor:'#dc2626' },
+        { label:'Due in 4-6 months', data:data.expiry.map(r=>r.b), backgroundColor:'#f59e0b' },
+        { label:'Due in 7-9 months', data:data.expiry.map(r=>r.c), backgroundColor:'#1e3a8a' },
+      ]
+    },
+    options:{
+      indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ position:'bottom', labels:{ color:tickColor(), font:{size:11} } } },
+      scales:{
+        x:{ stacked:true, ticks:{ color:tickColor(), callback:v=>v+'%' }, grid:{ color:gridColor() } },
+        y:{ stacked:true, ticks:{ color:tickColor() }, grid:{ display:false } }
+      }
+    }
+  });
+}
+function renderReversion(){
+  const labels = data.reversion.map(r=>r.p);
+  const values = data.reversion.map(r=>r.v);
+  const colors = values.map(v=> v<0?'#dc2626':'#16a34a');
+  if (reversionChart) reversionChart.destroy();
+  reversionChart = new Chart(document.getElementById('reversionChart'), {
+    type:'bar',
+    data:{ labels, datasets:[{ data:values, backgroundColor:colors, borderRadius:4 }] },
+    options:{
+      indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label:c=>`${c.parsed.x}%` } } },
+      scales:{
+        x:{ min:-10, max:10, ticks:{ stepSize:5, color:tickColor(), callback:v=>v+'%' }, grid:{ color:gridColor() } },
+        y:{ ticks:{ color:tickColor() }, grid:{ display:false } }
+      }
+    }
+  });
+}
+function renderNpi(){
+  if (npiChart) npiChart.destroy();
+  npiChart = new Chart(document.getElementById('npiChart'), {
+    type:'line',
+    data:{
+      labels: data.npi.map(r=>r.x),
+      datasets:[{ data:data.npi.map(r=>r.y), borderColor:'#1e3a8a', backgroundColor:'rgba(30,58,138,.1)', tension:.3, fill:true, pointRadius:4, pointBackgroundColor:'#1e3a8a' }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label:c=>`HK$${c.parsed.y}M` } } },
+      scales:{
+        x:{ ticks:{ color:tickColor() }, grid:{ display:false } },
+        y:{ min:0, max:280, ticks:{ stepSize:70, color:tickColor(), callback:v=>v+'M' }, grid:{ color:gridColor() } }
+      }
+    }
+  });
+}
+
+/* ---------- INIT ---------- */
+function rerenderCharts(){
+  renderBmeChart(document.getElementById('bmeSelect').value);
+  renderExpiry();
+  renderReversion();
+  renderNpi();
+}
+
+renderPnl(); renderPnlProp(); renderBmeItems(); renderOcc();
+renderTenants("Apparel & Shoes");
+rerenderCharts();
+
+document.getElementById('bmeSelect').addEventListener('change', e => renderBmeChart(e.target.value));
+document.getElementById('tenantSelect').addEventListener('change', e => renderTenants(e.target.value));
+
+/* ---------- THEME ---------- */
+const stored = localStorage.getItem('theme');
+if (stored === 'dark') document.documentElement.classList.add('dark');
+document.getElementById('themeToggle').addEventListener('click', () => {
+  document.documentElement.classList.toggle('dark');
+  localStorage.setItem('theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+  rerenderCharts();
+  lucide.createIcons();
+});
+
+lucide.createIcons();
+</script>
+</body>
+</html>
