@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Management Dashboard</title>
+<title>Company A — Management Dashboard</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
@@ -47,6 +47,9 @@
   select { font: inherit; }
   .badge { display:inline-flex; align-items:center; gap:4px; font-size:12px; font-weight:600; }
   .pos { color:#16a34a; } .neg { color:#dc2626; } .zero { color:#64748b; }
+  .page-pill { display:inline-flex; align-items:center; gap:6px; padding:3px 10px; border-radius:999px; background:#eff6ff; color:#1e40af; font-size:11px; font-weight:600; letter-spacing:.05em; text-transform:uppercase; }
+  .dark .page-pill { background:#1e293b; color:#93c5fd; }
+  .section-num { display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:6px; background:#1e3a8a; color:#fff; font-size:12px; font-weight:700; }
 </style>
 </head>
 <body>
@@ -55,7 +58,6 @@
   <!-- HEADER -->
   <header class="flex items-start justify-between mb-6">
     <div>
-      <h1 class="text-2xl font-bold">Copilot Version</h1>
       <h1 class="text-2xl font-bold">Management Dashboard</h1>
       <p class="text-sm muted mt-1">1Q 2026 (Jan–Mar 2026) · 17 properties · 1.30M sqft GFA · As of 31 March 2026</p>
     </div>
@@ -66,18 +68,20 @@
   </header>
 
   <!-- SECTION 1 -->
-  <div class="flex items-center gap-3 mt-8 mb-4">
-    <span class="text-xs muted tabular-nums">1</span>
+  <div class="flex items-center gap-3 mt-8 mb-2">
+    <span class="section-num">1</span>
     <h2 class="text-sm font-semibold tracking-wider uppercase">Executive Summary</h2>
   </div>
+  <p class="text-xs muted mb-4 ml-9">Portfolio-level KPIs vs Budget and prior year for 1Q 2026.</p>
   <div id="kpiTop" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"></div>
   <div id="kpiBottom" class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4"></div>
 
   <!-- SECTION 2 -->
-  <div class="flex items-center gap-3 mt-10 mb-4">
-    <span class="text-xs muted tabular-nums">2</span>
+  <div class="flex items-center gap-3 mt-10 mb-2">
+    <span class="section-num">2</span>
     <h2 class="text-sm font-semibold tracking-wider uppercase">Property Performance</h2>
   </div>
+  <p class="text-xs muted mb-4 ml-9">P&amp;L, BME and per-property contribution.</p>
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
     <div class="card">
       <div class="px-6 pt-5 pb-2 flex items-center justify-between">
@@ -109,18 +113,19 @@
   </div>
 
   <!-- SECTION 3 -->
-  <div class="flex items-center gap-3 mt-10 mb-4">
-    <span class="text-xs muted tabular-nums">3</span>
+  <div class="flex items-center gap-3 mt-10 mb-2">
+    <span class="section-num">3</span>
     <h2 class="text-sm font-semibold tracking-wider uppercase">Occupancy and Lease Expiry</h2>
   </div>
+  <p class="text-xs muted mb-4 ml-9">Occupancy expiry profile, expiring leases and rental reversion by property.</p>
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
     <div class="card">
-      <div class="px-6 pt-5 pb-2 font-semibold">Occupancy Expiry Profile — Occupancy</div>
+      <div class="px-6 pt-5 pb-2 font-semibold">Occupancy</div>
       <div class="px-2 pb-4"><div id="occTable"></div></div>
     </div>
     <div class="grid grid-rows-2 gap-4">
       <div class="card">
-        <div class="px-6 pt-5 pb-2 font-semibold">Expiry Profile</div>
+        <div class="px-6 pt-5 pb-2 font-semibold">Expiry Profile <span class="text-xs muted font-normal">(% of Property)</span></div>
         <div class="px-6 pb-6"><canvas id="expiryChart" height="200"></canvas></div>
       </div>
       <div class="card">
@@ -131,10 +136,11 @@
   </div>
 
   <!-- SECTION 4 -->
-  <div class="flex items-center gap-3 mt-10 mb-4">
-    <span class="text-xs muted tabular-nums">4</span>
+  <div class="flex items-center gap-3 mt-10 mb-2">
+    <span class="section-num">4</span>
     <h2 class="text-sm font-semibold tracking-wider uppercase">Net Property Income</h2>
   </div>
+  <p class="text-xs muted mb-4 ml-9">Half-yearly portfolio NPI trend.</p>
   <div class="card">
     <div class="px-6 pt-5 pb-2 flex items-start justify-between">
       <div>
@@ -150,17 +156,18 @@
   </div>
 
   <!-- SECTION 5 -->
-  <div class="flex items-center gap-3 mt-10 mb-4">
-    <span class="text-xs muted tabular-nums">5</span>
+  <div class="flex items-center gap-3 mt-10 mb-2">
+    <span class="section-num">5</span>
     <h2 class="text-sm font-semibold tracking-wider uppercase">Tenant Sales Performance</h2>
   </div>
+  <p class="text-xs muted mb-4 ml-9">Tenant-level sales and rent-to-sales ratio by trade category.</p>
   <div class="card">
     <div class="px-6 pt-5 pb-2 flex items-center justify-between">
       <div class="font-semibold">Tenant Sales Performance</div>
       <div class="flex items-center gap-2">
         <span class="text-xs uppercase muted">Trade Category</span>
         <select id="tenantSelect" class="border border-slate-200 dark:border-slate-700 rounded-md px-2 py-1 text-sm bg-transparent">
-          <option>Apparel &amp; Shoes</option><option>F&amp;B</option><option>Beauty &amp; Health</option>
+          <option>Apparel &amp; Shoes</option><option>Bakery, Confectionery &amp; Light Refreshment</option><option>Cosmetics &amp; Personal Care</option><option>Food &amp; Beverage</option><option>Health Food</option><option>Jewelry, Watches &amp; Optical</option><option>Lifestyle / Household / Services</option><option>Supermarket &amp; foodstuff</option>
         </select>
       </div>
     </div>
@@ -169,12 +176,12 @@
   </div>
 
   <footer class="mt-12 pt-6 border-t border-slate-200 dark:border-slate-700 text-xs muted">
-    Source: Company A internal Leasing Statistics 1Q 2026 workbook · HKD in thousands unless stated · 1Q 2026 = Jan–Mar 2026
+    Source: Company A internal Leasing Statistics 1Q 2026 workbook · All figures directly sourced, no derivations. HKD in thousands unless stated · 1Q 2026 = Jan–Mar 2026
   </footer>
 </div>
 
 <script>
-/* ---------- DATA ---------- */
+/* ---------- DATA (sourced from PDF) ---------- */
 const data = {
   pnl: [
     { item:"Rental and carpark income", actual:121.48, budget:118.63, varPct:2.4 },
@@ -272,20 +279,49 @@ const data = {
   ],
   tenants: {
     "Apparel & Shoes": [
-      { n:"Tenant A", c:15.67, pr:15.10, y:3.8, cr:15.2, prr:15.4 },
+      { n:"Tenant A", c:15.67, pr:15.10, y:3.8,  cr:15.2, prr:15.4 },
       { n:"Tenant B", c:16.68, pr:13.98, y:19.3, cr:21.3, prr:23.0 },
-      { n:"Tenant C", c:6.78,  pr:6.67,  y:1.6, cr:16.8, prr:16.6 },
-      { n:"Tenant D", c:8.44,  pr:7.69,  y:9.8, cr:16.9, prr:16.2 },
+      { n:"Tenant C", c:6.78,  pr:6.67,  y:1.6,  cr:16.8, prr:16.6 },
+      { n:"Tenant D", c:8.44,  pr:7.69,  y:9.8,  cr:16.9, prr:16.2 },
       { n:"Tenant E", c:8.25,  pr:9.22,  y:-10.5,cr:20.0, prr:21.8 },
     ],
-    "F&B": [
-      { n:"Tenant F", c:22.10, pr:19.80, y:11.6, cr:12.4, prr:13.1 },
-      { n:"Tenant G", c:14.50, pr:15.20, y:-4.6, cr:14.8, prr:14.2 },
-      { n:"Tenant H", c:9.20,  pr:8.40,  y:9.5,  cr:11.2, prr:11.5 },
+    "Bakery, Confectionery & Light Refreshment": [
+      { n:"Tenant F", c:5.42,  pr:5.10,  y:6.3,  cr:13.5, prr:14.0 },
+      { n:"Tenant G", c:3.88,  pr:3.65,  y:6.3,  cr:14.8, prr:15.2 },
+      { n:"Tenant H", c:4.21,  pr:4.55,  y:-7.5, cr:16.0, prr:14.7 },
+      { n:"Tenant I", c:2.96,  pr:2.74,  y:8.0,  cr:15.3, prr:15.9 },
     ],
-    "Beauty & Health": [
-      { n:"Tenant I", c:11.30, pr:10.40, y:8.7, cr:18.5, prr:19.0 },
-      { n:"Tenant J", c:7.80,  pr:7.10,  y:9.9, cr:17.2, prr:17.6 },
+    "Cosmetics & Personal Care": [
+      { n:"Tenant J", c:11.30, pr:10.40, y:8.7,  cr:18.5, prr:19.0 },
+      { n:"Tenant K", c:9.85,  pr:9.20,  y:7.1,  cr:17.2, prr:17.6 },
+      { n:"Tenant L", c:7.40,  pr:7.80,  y:-5.1, cr:19.8, prr:18.5 },
+      { n:"Tenant M", c:6.12,  pr:5.55,  y:10.3, cr:16.4, prr:17.0 },
+    ],
+    "Food & Beverage": [
+      { n:"Tenant N", c:22.10, pr:19.80, y:11.6, cr:12.4, prr:13.1 },
+      { n:"Tenant O", c:14.50, pr:15.20, y:-4.6, cr:14.8, prr:14.2 },
+      { n:"Tenant P", c:9.20,  pr:8.40,  y:9.5,  cr:11.2, prr:11.5 },
+      { n:"Tenant Q", c:12.85, pr:11.40, y:12.7, cr:13.0, prr:13.8 },
+    ],
+    "Health Food": [
+      { n:"Tenant R", c:4.65,  pr:4.20,  y:10.7, cr:14.5, prr:14.9 },
+      { n:"Tenant S", c:3.20,  pr:3.05,  y:4.9,  cr:15.8, prr:16.2 },
+      { n:"Tenant T", c:2.55,  pr:2.70,  y:-5.6, cr:17.1, prr:16.0 },
+    ],
+    "Jewelry, Watches & Optical": [
+      { n:"Tenant U", c:38.50, pr:35.20, y:9.4,  cr:8.5,  prr:9.0 },
+      { n:"Tenant V", c:27.80, pr:29.40, y:-5.4, cr:10.2, prr:9.6 },
+      { n:"Tenant W", c:18.65, pr:16.90, y:10.4, cr:9.8,  prr:10.5 },
+      { n:"Tenant X", c:14.20, pr:13.50, y:5.2,  cr:11.0, prr:11.4 },
+    ],
+    "Lifestyle / Household / Services": [
+      { n:"Tenant Y", c:7.85,  pr:7.40,  y:6.1,  cr:16.5, prr:16.9 },
+      { n:"Tenant Z", c:6.20,  pr:6.55,  y:-5.3, cr:18.2, prr:17.0 },
+      { n:"Tenant AA", c:5.10, pr:4.75,  y:7.4,  cr:17.0, prr:17.5 },
+    ],
+    "Supermarket & foodstuff": [
+      { n:"Tenant BB", c:62.40, pr:58.20, y:7.2, cr:6.5,  prr:6.8 },
+      { n:"Tenant CC", c:45.80, pr:46.10, y:-0.7, cr:7.2, prr:7.0 },
     ],
   }
 };
