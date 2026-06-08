@@ -7,14 +7,18 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+https://fonts.googleapis.com
+https://fonts.gstatic.com
+;500;600;700&display=swap" rel="stylesheet" />
 <script>
   tailwind.config = {
     darkMode: 'class',
-    theme: { extend: {
-      fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
-      colors: { positive:'#16a34a', negative:'#dc2626', warning:'#f59e0b', brand:'#1e3a8a' }
-    }}
+    theme: {
+      extend: {
+        fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+        colors: { positive: '#16a34a', negative: '#dc2626', warning: '#f59e0b', brand: '#1e3a8a' }
+      }
+    }
   }
 </script>
 <style>
@@ -38,36 +42,24 @@
   .total-row td { background: #e2e8f0; font-weight: 700; }
   .dark .total-row td { background: #334155; }
   select { font: inherit; }
-  /* P&L (By Property) two-tier header */
-  table.tbl.pnl-prop thead tr.group-header th { border-bottom: 1px solid #e2e8f0; }
-  .dark table.tbl.pnl-prop thead tr.group-header th { border-color:#1e293b; }
-  table.tbl.pnl-prop thead tr.sub-header th { border-bottom: 1px solid #e2e8f0; padding-top: 6px; padding-bottom: 10px; }
-  .dark table.tbl.pnl-prop thead tr.sub-header th { border-color:#1e293b; }
-  table.tbl.pnl-prop .col-divider { border-right: 1px solid #e2e8f0; }
-  .dark table.tbl.pnl-prop .col-divider { border-right-color: #1e293b; }
-  /* Responsive scroll wrappers */
-  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; position: relative; }
-  .table-scroll table { min-width: 100%; }
-  table.tbl.pnl-prop { min-width: 720px; }
-  table.tbl.occ-tbl { min-width: 480px; }
-  table.tbl.tenant-tbl { min-width: 680px; }
-  @media (max-width: 768px) {
-    table.tbl { font-size: 12px; }
-    table.tbl th, table.tbl td { padding: 8px 6px; }
-    table.tbl.pnl-prop th, table.tbl.pnl-prop td { padding: 8px 5px; }
-  }
+  table.pnl-prop th { border-bottom: none; padding: 8px 10px; }
+  table.pnl-prop thead tr.group-header th { border-bottom: 1px solid #e2e8f0; font-weight: 600; color:#475569; text-transform:uppercase; font-size:11px; letter-spacing:.05em; }
+  .dark table.pnl-prop thead tr.group-header th { border-color:#1e293b; color:#cbd5e1; }
+  table.pnl-prop thead tr.sub-header th { border-bottom: 1px solid #e2e8f0; padding-top: 6px; padding-bottom: 10px; font-size: 10.5px; }
+  .dark table.pnl-prop thead tr.sub-header th { border-color:#1e293b; }
+  table.pnl-prop td { padding: 9px 10px; font-size: 12.5px; }
   .badge { display:inline-flex; align-items:center; gap:4px; font-size:12px; font-weight:600; }
   .pos { color:#16a34a; } .neg { color:#dc2626; } .zero { color:#64748b; }
   .section-num { display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:6px; background:#1e3a8a; color:#fff; font-size:12px; font-weight:700; }
 </style>
 </head>
 <body>
-<div id="app" class="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 sm:py-8">
+<div id="app" class="max-w-[1400px] mx-auto px-6 py-8">
 
   <header class="flex items-start justify-between mb-6">
     <div>
-      <h1 class="text-2xl font-bold">Management Dashboard (Copilot Version)</h1>
-      <p class="text-sm muted mt-1">1Q 2026 (Jan–Mar 2026) </p>
+      <h1 class="text-2xl font-bold">Management Dashboard</h1>
+      <p class="text-sm muted mt-1">1Q 2026 (Jan–Mar 2026) · 17 properties · 1.30M sqft GFA · As of 31 March 2026</p>
     </div>
     <button id="themeToggle" class="p-2 rounded-md border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition" aria-label="Toggle theme">
       <i data-lucide="moon" class="h-4 w-4 hidden dark:inline"></i>
@@ -93,17 +85,20 @@
       <div class="px-6 pt-5 pb-2 font-semibold">Profit &amp; Loss <span class="text-xs muted font-normal">(HK$M)</span></div>
       <div class="px-2 pb-4"><div id="pnlTable"></div></div>
     </div>
+
     <div class="card">
       <div class="px-6 pt-5 pb-2 font-semibold">Profit &amp; Loss (By Property) <span class="text-xs muted font-normal">(HK$M)</span></div>
       <div class="px-2 pb-4"><div id="pnlPropTable"></div></div>
       <p class="text-xs muted px-6 pb-4">NPI = Revenue − OPEX. BME (Building Management Expenses) shown for information only and is not deducted in NPI.</p>
     </div>
+
     <div class="card">
       <div class="px-6 pt-5 pb-2 font-semibold">BME Breakdown <span class="text-xs muted font-normal">(By Items — Overall, HK$M)</span></div>
       <div class="px-2 pb-4"><div id="bmeItemsTable"></div></div>
     </div>
+
     <div class="card">
-      <div class="px-6 pt-5 pb-2 flex items-center justify-between flex-wrap gap-2">
+      <div class="px-6 pt-5 pb-2 flex items-center justify-between">
         <div class="font-semibold">BME Breakdown <span class="text-xs muted font-normal">(By Property and By Items)</span></div>
         <select id="bmeSelect" class="border border-slate-200 dark:border-slate-700 rounded-md px-2 py-1 text-sm bg-transparent">
           <option>Electricity</option><option>Staff Cost</option><option>Security</option>
@@ -141,7 +136,7 @@
   </div>
   <p class="text-xs muted mb-4 ml-9">Half-yearly portfolio NPI trend.</p>
   <div class="card">
-    <div class="px-6 pt-5 pb-2 flex items-start justify-between flex-wrap gap-2">
+    <div class="px-6 pt-5 pb-2 flex items-start justify-between">
       <div>
         <div class="font-semibold">NPI Trend</div>
         <p class="text-xs muted mt-1">Half-yearly · FY 2024 – FY 2026 · Portfolio</p>
@@ -160,7 +155,7 @@
   </div>
   <p class="text-xs muted mb-4 ml-9">Tenant-level sales and rent-to-sales ratio by trade category.</p>
   <div class="card">
-    <div class="px-6 pt-5 pb-2 flex items-center justify-between flex-wrap gap-2">
+    <div class="px-6 pt-5 pb-2 flex items-center justify-between">
       <div class="font-semibold">Tenant Sales Performance</div>
       <div class="flex items-center gap-2">
         <span class="text-xs uppercase muted">Trade Category</span>
@@ -292,10 +287,10 @@ const data = {
       { n:"Tenant E", c:8.25,  pr:9.22,  y:-10.5,cr:20.0, prr:21.8 },
     ],
     "Bakery, Confectionery & Light Refreshment": [
-      { n:"Tenant F", c:5.42,  pr:5.10,  y:6.3,  cr:13.5, prr:14.0 },
-      { n:"Tenant G", c:3.88,  pr:3.65,  y:6.3,  cr:14.8, prr:15.2 },
-      { n:"Tenant H", c:4.21,  pr:4.55,  y:-7.5, cr:16.0, prr:14.7 },
-      { n:"Tenant I", c:2.96,  pr:2.74,  y:8.0,  cr:15.3, prr:15.9 },
+      { n:"Tenant F", c:5.42, pr:5.10, y:6.3,  cr:13.5, prr:14.0 },
+      { n:"Tenant G", c:3.88, pr:3.65, y:6.3,  cr:14.8, prr:15.2 },
+      { n:"Tenant H", c:4.21, pr:4.55, y:-7.5, cr:16.0, prr:14.7 },
+      { n:"Tenant I", c:2.96, pr:2.74, y:8.0,  cr:15.3, prr:15.9 },
     ],
     "Cosmetics & Personal Care": [
       { n:"Tenant J", c:11.30, pr:10.40, y:8.7,  cr:18.5, prr:19.0 },
@@ -310,9 +305,9 @@ const data = {
       { n:"Tenant Q", c:12.85, pr:11.40, y:12.7, cr:13.0, prr:13.8 },
     ],
     "Health Food": [
-      { n:"Tenant R", c:4.65,  pr:4.20,  y:10.7, cr:14.5, prr:14.9 },
-      { n:"Tenant S", c:3.20,  pr:3.05,  y:4.9,  cr:15.8, prr:16.2 },
-      { n:"Tenant T", c:2.55,  pr:2.70,  y:-5.6, cr:17.1, prr:16.0 },
+      { n:"Tenant R", c:4.65, pr:4.20, y:10.7, cr:14.5, prr:14.9 },
+      { n:"Tenant S", c:3.20, pr:3.05, y:4.9,  cr:15.8, prr:16.2 },
+      { n:"Tenant T", c:2.55, pr:2.70, y:-5.6, cr:17.1, prr:16.0 },
     ],
     "Jewelry, Watches & Optical": [
       { n:"Tenant U", c:38.50, pr:35.20, y:9.4,  cr:8.5,  prr:9.0 },
@@ -321,12 +316,12 @@ const data = {
       { n:"Tenant X", c:14.20, pr:13.50, y:5.2,  cr:11.0, prr:11.4 },
     ],
     "Lifestyle / Household / Services": [
-      { n:"Tenant Y", c:7.85,  pr:7.40,  y:6.1,  cr:16.5, prr:16.9 },
-      { n:"Tenant Z", c:6.20,  pr:6.55,  y:-5.3, cr:18.2, prr:17.0 },
-      { n:"Tenant AA", c:5.10, pr:4.75,  y:7.4,  cr:17.0, prr:17.5 },
+      { n:"Tenant Y",  c:7.85, pr:7.40, y:6.1,  cr:16.5, prr:16.9 },
+      { n:"Tenant Z",  c:6.20, pr:6.55, y:-5.3, cr:18.2, prr:17.0 },
+      { n:"Tenant AA", c:5.10, pr:4.75, y:7.4,  cr:17.0, prr:17.5 },
     ],
     "Supermarket & foodstuff": [
-      { n:"Tenant BB", c:62.40, pr:58.20, y:7.2, cr:6.5,  prr:6.8 },
+      { n:"Tenant BB", c:62.40, pr:58.20, y:7.2,  cr:6.5, prr:6.8 },
       { n:"Tenant CC", c:45.80, pr:46.10, y:-0.7, cr:7.2, prr:7.0 },
     ],
   }
@@ -401,13 +396,15 @@ function renderPnl() {
       <td class="text-right tabular-nums font-medium ${sign(r.varPct)}">${r.varPct>0?'+':''}${r.varPct.toFixed(1)}</td>
     </tr>`).join('');
   document.getElementById('pnlTable').innerHTML = `
-    <div class="table-scroll"><table class="tbl">
+    <table class="tbl">
       <thead><tr><th>Line Item</th><th class="text-right">Actual</th><th class="text-right">Budget</th><th class="text-right">Var %</th></tr></thead>
       <tbody>${rows}</tbody>
-    </table></div>`;
+    </table>`;
 }
 
 function renderPnlProp() {
+  // Color: % drives color for both % and $ in same group.
+  // Revenue/NPI: + green, - red.  OPEX/BME: + red (unfavorable), - green (favorable).
   const colorFor = (group, pct) => {
     if (pct === 0) return 'zero';
     const favorable = (group === 'rev' || group === 'npi') ? (pct > 0) : (pct < 0);
@@ -419,19 +416,209 @@ function renderPnlProp() {
   };
   const cellDol = (group, val, isLast=false) => {
     const cls = colorFor(group, val.pct);
-    const border = isLast ? '' : 'col-divider';
+    const border = isLast ? '' : 'border-r border-slate-200 dark:border-slate-700';
     return `<td class="text-right tabular-nums ${cls} ${border}">${val.dol>0?'+':''}${val.dol.toFixed(2)}</td>`;
   };
   const rows = data.pnlProp.map(r => `
     <tr class="${r.bold?'bold-row':''}">
-      <td class="col-divider ${r.bold?'font-bold':''}">${r.p}</td>
+      <td class="border-r border-slate-200 dark:border-slate-700 ${r.bold?'font-bold':''}">${r.p}</td>
       ${cellPct('rev', r.rev)}${cellDol('rev', r.rev)}
       ${cellPct('opex', r.opex)}${cellDol('opex', r.opex)}
       ${cellPct('bme', r.bme)}${cellDol('bme', r.bme)}
       ${cellPct('npi', r.npi)}${cellDol('npi', r.npi, true)}
     </tr>`).join('');
   document.getElementById('pnlPropTable').innerHTML = `
-    <div class="table-scroll"><table class="tbl pnl-prop">
+    <table class="tbl pnl-prop">
       <thead>
         <tr class="group-header">
-          <th rowspan="2" class="align-bottom col-divider">Property</th>
+          <th rowspan="2" class="align-bottom border-r border-slate-200 dark:border-slate-700">Property</th>
+          <th colspan="2" class="text-center border-r border-slate-200 dark:border-slate-700">Revenue</th>
+          <th colspan="2" class="text-center border-r border-slate-200 dark:border-slate-700">OPEX</th>
+          <th colspan="2" class="text-center border-r border-slate-200 dark:border-slate-700">BME</th>
+          <th colspan="2" class="text-center">NPI</th>
+        </tr>
+        <tr class="sub-header">
+          <th class="text-right">YOY %</th><th class="text-right border-r border-slate-200 dark:border-slate-700">YOY $</th>
+          <th class="text-right">YOY %</th><th class="text-right border-r border-slate-200 dark:border-slate-700">YOY $</th>
+          <th class="text-right">YOY %</th><th class="text-right border-r border-slate-200 dark:border-slate-700">YOY $</th>
+          <th class="text-right">YOY %</th><th class="text-right">YOY $</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function renderBmeItems() {
+  const rows = data.bmeItems.map(r => `
+    <tr class="${r.bold?'bold-row':''}">
+      <td>${r.i}</td>
+      <td class="text-right tabular-nums">${r.ytd.toFixed(2)}</td>
+      <td class="text-right tabular-nums ${signInv(r.vb)}">${r.vb>0?'+':''}${r.vb.toFixed(1)}%</td>
+      <td class="text-right tabular-nums ${signInv(r.yp)}">${r.yp>0?'+':''}${r.yp.toFixed(1)}%</td>
+      <td class="text-right tabular-nums ${signInv(r.yd)}">${r.yd>0?'+':''}${r.yd.toFixed(2)}</td>
+    </tr>`).join('');
+  document.getElementById('bmeItemsTable').innerHTML = `
+    <table class="tbl">
+      <thead><tr><th>Item</th><th class="text-right">YTD</th><th class="text-right">VS Budget</th><th class="text-right">YOY %</th><th class="text-right">YOY $</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function renderOcc() {
+  const periods = data.occPeriods;
+  const head = `<tr><th>Property</th>${periods.map(p=>`<th class="text-right">${p}</th>`).join('')}</tr>`;
+  const rows = data.occ.map(r => {
+    const cls = r.seg==='sub' ? 'bold-row' : (r.seg==='total' ? 'total-row' : '');
+    const cells = r.v.map(v => {
+      const low = (r.seg==='office'||r.seg==='retail') && v<90;
+      return `<td class="text-right tabular-nums ${low?'neg font-semibold':''}">${v.toFixed(1)}%</td>`;
+    }).join('');
+    return `<tr class="${cls}"><td>${r.p}</td>${cells}</tr>`;
+  }).join('');
+  document.getElementById('occTable').innerHTML = `<table class="tbl"><thead>${head}</thead><tbody>${rows}</tbody></table>`;
+}
+
+function renderTenants(cat) {
+  const rows = data.tenants[cat];
+  const sumC = rows.reduce((a,r)=>a+r.c,0);
+  const sumP = rows.reduce((a,r)=>a+r.pr,0);
+  const yTot = ((sumC-sumP)/sumP)*100;
+  const body = rows.map(r=>`
+    <tr>
+      <td>${r.n}</td>
+      <td class="text-right tabular-nums">HK$${r.c.toFixed(2)}M</td>
+      <td class="text-right tabular-nums">HK$${r.pr.toFixed(2)}M</td>
+      <td class="text-right tabular-nums font-medium ${sign(r.y)}">${r.y>0?'+':''}${r.y.toFixed(1)}%</td>
+      <td class="text-right tabular-nums">${r.cr.toFixed(1)}%</td>
+      <td class="text-right tabular-nums">${r.prr.toFixed(1)}%</td>
+    </tr>`).join('');
+  const total = `
+    <tr class="total-row">
+      <td>Category Total</td>
+      <td class="text-right tabular-nums">HK$${sumC.toFixed(2)}M</td>
+      <td class="text-right tabular-nums">HK$${sumP.toFixed(2)}M</td>
+      <td class="text-right tabular-nums ${sign(yTot)}">${yTot>0?'+':''}${yTot.toFixed(1)}%</td>
+      <td class="text-right tabular-nums">—</td>
+      <td class="text-right tabular-nums">—</td>
+    </tr>`;
+  document.getElementById('tenantTable').innerHTML = `
+    <table class="tbl">
+      <thead><tr>
+        <th>Trade Name</th><th class="text-right">Current Period Sales</th>
+        <th class="text-right">Prior Period Sales</th><th class="text-right">YOY %</th>
+        <th class="text-right">Current R/S Ratio</th><th class="text-right">Prior R/S Ratio</th>
+      </tr></thead>
+      <tbody>${body}${total}</tbody>
+    </table>`;
+}
+
+let bmeChart, expiryChart, reversionChart, npiChart;
+function gridColor(){ return document.documentElement.classList.contains('dark') ? '#1e293b' : '#e2e8f0'; }
+function tickColor(){ return document.documentElement.classList.contains('dark') ? '#94a3b8' : '#64748b'; }
+
+function renderBmeChart(item){
+  const rows = data.bmeByProp[item];
+  const labels = rows.map(r=>r.p);
+  const values = rows.map(r=>r.v);
+  const colors = values.map(v => v<0 ? '#16a34a' : '#dc2626');
+  if (bmeChart) bmeChart.destroy();
+  bmeChart = new Chart(document.getElementById('bmeChart'), {
+    type:'bar',
+    data:{ labels, datasets:[{ data:values, backgroundColor:colors, borderRadius:4 }] },
+    options:{
+      indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label:(c)=>`${c.parsed.x}%` } } },
+      scales:{
+        x:{ min:-16, max:16, ticks:{ stepSize:8, color:tickColor(), callback:v=>v+'%' }, grid:{ color:gridColor() } },
+        y:{ ticks:{ color:tickColor() }, grid:{ display:false } }
+      }
+    }
+  });
+}
+function renderExpiry(){
+  const labels = data.expiry.map(r=>r.p);
+  if (expiryChart) expiryChart.destroy();
+  expiryChart = new Chart(document.getElementById('expiryChart'), {
+    type:'bar',
+    data:{
+      labels,
+      datasets:[
+        { label:'Due in 1-3 months', data:data.expiry.map(r=>r.a), backgroundColor:'#dc2626' },
+        { label:'Due in 4-6 months', data:data.expiry.map(r=>r.b), backgroundColor:'#f59e0b' },
+        { label:'Due in 7-9 months', data:data.expiry.map(r=>r.c), backgroundColor:'#1e3a8a' },
+      ]
+    },
+    options:{
+      indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ position:'bottom', labels:{ color:tickColor(), font:{size:11} } } },
+      scales:{
+        x:{ stacked:true, ticks:{ color:tickColor(), callback:v=>v+'%' }, grid:{ color:gridColor() } },
+        y:{ stacked:true, ticks:{ color:tickColor() }, grid:{ display:false } }
+      }
+    }
+  });
+}
+function renderReversion(){
+  const labels = data.reversion.map(r=>r.p);
+  const values = data.reversion.map(r=>r.v);
+  const colors = values.map(v=> v<0?'#dc2626':'#16a34a');
+  if (reversionChart) reversionChart.destroy();
+  reversionChart = new Chart(document.getElementById('reversionChart'), {
+    type:'bar',
+    data:{ labels, datasets:[{ data:values, backgroundColor:colors, borderRadius:4 }] },
+    options:{
+      indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label:c=>`${c.parsed.x}%` } } },
+      scales:{
+        x:{ min:-10, max:10, ticks:{ stepSize:5, color:tickColor(), callback:v=>v+'%' }, grid:{ color:gridColor() } },
+        y:{ ticks:{ color:tickColor() }, grid:{ display:false } }
+      }
+    }
+  });
+}
+function renderNpi(){
+  if (npiChart) npiChart.destroy();
+  npiChart = new Chart(document.getElementById('npiChart'), {
+    type:'line',
+    data:{
+      labels: data.npi.map(r=>r.x),
+      datasets:[{ data:data.npi.map(r=>r.y), borderColor:'#1e3a8a', backgroundColor:'rgba(30,58,138,.1)', tension:.3, fill:true, pointRadius:4, pointBackgroundColor:'#1e3a8a' }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label:c=>`HK$${c.parsed.y}M` } } },
+      scales:{
+        x:{ ticks:{ color:tickColor() }, grid:{ display:false } },
+        y:{ min:0, max:280, ticks:{ stepSize:70, color:tickColor(), callback:v=>v+'M' }, grid:{ color:gridColor() } }
+      }
+    }
+  });
+}
+
+function rerenderCharts(){
+  renderBmeChart(document.getElementById('bmeSelect').value);
+  renderExpiry();
+  renderReversion();
+  renderNpi();
+}
+
+renderPnl(); renderPnlProp(); renderBmeItems(); renderOcc();
+renderTenants("Apparel & Shoes");
+rerenderCharts();
+
+document.getElementById('bmeSelect').addEventListener('change', e => renderBmeChart(e.target.value));
+document.getElementById('tenantSelect').addEventListener('change', e => renderTenants(e.target.value));
+
+const stored = localStorage.getItem('theme');
+if (stored === 'dark') document.documentElement.classList.add('dark');
+document.getElementById('themeToggle').addEventListener('click', () => {
+  document.documentElement.classList.toggle('dark');
+  localStorage.setItem('theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+  rerenderCharts();
+  lucide.createIcons();
+});
+
+lucide.createIcons();
+</script>
+</body>
+</html>
