@@ -600,21 +600,62 @@ document.getElementById("fileInput").addEventListener("change", async (e)=>{
   try{
    const s1=getSheet(0);
    if(s1){
+    let colA=1, colB=2, colV=3, colY=4;
+    for(const row of s1){
+     if(!row) continue;
+     const tmp={};
+     for(let i=0;i<row.length;i++){
+      const cell=row[i]; if(cell==null||cell==="") continue;
+      const s=String(cell).toLowerCase().trim();
+      if(s==="actual"||s==="ytd"||s==="ytd actual"||s.startsWith("actual ")||s===("actual ytd")) tmp.a=i;
+      else if(s==="budget"||s.startsWith("budget ")||s.startsWith("bgt")||(s.includes("bgt")&&!s.includes("vs"))) tmp.b=i;
+      else if(s.includes("yoy")||s.includes("y-o-y")||s.includes("y/y")) tmp.y=i;
+      else if(s.includes("vs bgt")||s.includes("vs budget")||s.startsWith("var")||s.includes("variance")) tmp.v=i;
+     }
+     if(tmp.a!==undefined && tmp.b!==undefined){
+      colA=tmp.a; colB=tmp.b;
+      if(tmp.v!==undefined) colV=tmp.v;
+      if(tmp.y!==undefined) colY=tmp.y;
+      break;
+     }
+    }
     const rev=findRow(s1,"Total Revenue"), opex=findRow(s1,"Operating Expenses"), npi=findRow(s1,"Net Property Income"), cti=findRow(s1,"Cost-to-Income");
     const occAll=findRow(s1,"Overall Occupancy"), occOff=findRow(s1,"Office Occupancy"), occRet=findRow(s1,"Retail Occupancy");
-    if(rev){merged.kpis.revenue.actual=toNum(rev[1])/1000; merged.kpis.revenue.budget=toNum(rev[2])/1000;
-     merged.kpis.revenue.vsBgtPct=merged.kpis.revenue.budget?((merged.kpis.revenue.actual-merged.kpis.revenue.budget)/merged.kpis.revenue.budget)*100:0;
-     merged.kpis.revenue.yoyPct=pct(rev[4]);}
-    if(opex){merged.kpis.opex.actual=Math.abs(toNum(opex[1]))/1000; merged.kpis.opex.budget=Math.abs(toNum(opex[2]))/1000;
-     merged.kpis.opex.vsBgtPct=merged.kpis.opex.budget?((merged.kpis.opex.actual-merged.kpis.opex.budget)/merged.kpis.opex.budget)*100:0;
-     merged.kpis.opex.yoyPct=pct(opex[4]);}
-    if(npi){merged.kpis.npi.actual=toNum(npi[1])/1000; merged.kpis.npi.budget=toNum(npi[2])/1000;
-     merged.kpis.npi.vsBgtPct=merged.kpis.npi.budget?((merged.kpis.npi.actual-merged.kpis.npi.budget)/merged.kpis.npi.budget)*100:0;
-     merged.kpis.npi.yoyPct=pct(npi[4]);}
-    if(cti){merged.kpis.costToInc.actual=pct(cti[1]); merged.kpis.costToInc.budget=pct(cti[2]); merged.kpis.costToInc.vsBgtPct=parsePP(cti[3]); merged.kpis.costToInc.yoyPct=parsePP(cti[4]);}
-    if(occAll){merged.occupancy.overall.value=pct(occAll[1]); merged.occupancy.overall.vsBgt=parsePP(occAll[3]);}
-    if(occOff){merged.occupancy.office.value=pct(occOff[1]); merged.occupancy.office.vsBgt=parsePP(occOff[3]);}
-    if(occRet){merged.occupancy.retail.value=pct(occRet[1]); merged.occupancy.retail.vsBgt=parsePP(occRet[3]);}
+    const safe=(obj,key,val)=>{if(Number.isFinite(val)) obj[key]=val;};
+    if(rev){
+     safe(merged.kpis.revenue,"actual",toNum(rev[colA])/1000);
+     safe(merged.kpis.revenue,"budget",toNum(rev[colB])/1000);
+     if(Number.isFinite(merged.kpis.revenue.actual)&&Number.isFinite(merged.kpis.revenue.budget)&&merged.kpis.revenue.budget){
+      merged.kpis.revenue.vsBgtPct=((merged.kpis.revenue.actual-merged.kpis.revenue.budget)/merged.kpis.revenue.budget)*100;
+     }
+     const y=pct(rev[colY]); if(Number.isFinite(y)&&y!==0) merged.kpis.revenue.yoyPct=y;
+    }
+    if(opex){
+     safe(merged.kpis.opex,"actual",Math.abs(toNum(opex[colA]))/1000);
+     safe(merged.kpis.opex,"budget",Math.abs(toNum(opex[colB]))/1000);
+     if(Number.isFinite(merged.kpis.opex.actual)&&Number.isFinite(merged.kpis.opex.budget)&&merged.kpis.opex.budget){
+      merged.kpis.opex.vsBgtPct=((merged.kpis.opex.actual-merged.kpis.opex.budget)/merged.kpis.opex.budget)*100;
+     }
+     const y=pct(opex[colY]); if(Number.isFinite(y)&&y!==0) merged.kpis.opex.yoyPct=y;
+    }
+    if(npi){
+     safe(merged.kpis.npi,"actual",toNum(npi[colA])/1000);
+     safe(merged.kpis.npi,"budget",toNum(npi[colB])/1000);
+     if(Number.isFinite(merged.kpis.npi.actual)&&Number.isFinite(merged.kpis.npi.budget)&&merged.kpis.npi.budget){
+      merged.kpis.npi.vsBgtPct=((merged.kpis.npi.actual-merged.kpis.npi.budget)/merged.kpis.npi.budget)*100;
+     }
+     const y=pct(npi[colY]); if(Number.isFinite(y)&&y!==0) merged.kpis.npi.yoyPct=y;
+    }
+    if(cti){
+     const a=pct(cti[colA]), b=pct(cti[colB]);
+     if(Number.isFinite(a)&&a!==0) merged.kpis.costToInc.actual=a;
+     if(Number.isFinite(b)&&b!==0) merged.kpis.costToInc.budget=b;
+     const v=parsePP(cti[colV]); if(Number.isFinite(v)) merged.kpis.costToInc.vsBgtPct=v;
+     const y=parsePP(cti[colY]); if(Number.isFinite(y)) merged.kpis.costToInc.yoyPct=y;
+    }
+    if(occAll){merged.occupancy.overall.value=pct(occAll[colA]); const vp=parsePP(occAll[colV]); if(Number.isFinite(vp)) merged.occupancy.overall.vsBgt=vp;}
+    if(occOff){merged.occupancy.office.value=pct(occOff[colA]); const vp=parsePP(occOff[colV]); if(Number.isFinite(vp)) merged.occupancy.office.vsBgt=vp;}
+    if(occRet){merged.occupancy.retail.value=pct(occRet[colA]); const vp=parsePP(occRet[colV]); if(Number.isFinite(vp)) merged.occupancy.retail.vsBgt=vp;}
     const leaseRow=(kw)=>s1.find(r=>r&&r[0]&&String(r[0]).trim().toLowerCase()===kw.toLowerCase());
     const lov=leaseRow("Overall"), lof=leaseRow("Office"), lre=leaseRow("Retail");
     if(lov){merged.leasing.overall.newLets=toNum(lov[1])||0; merged.leasing.overall.newSqft=toNum(lov[2])||0; merged.leasing.overall.renewals=toNum(lov[3])||0; merged.leasing.overall.renewSqft=toNum(lov[4])||0;}
