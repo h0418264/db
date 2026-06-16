@@ -22,6 +22,9 @@ html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:
 .topbar .actions{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
 .btn-load{background:var(--teal);color:#fff;border:0;border-radius:8px;padding:10px 16px;font-weight:600;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:.15s}
 .btn-load:hover{background:var(--teal-2);transform:translateY(-1px)}
+.btn-save{background:var(--navy);color:#fff;border:0;border-radius:8px;padding:10px 16px;font-weight:600;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:.15s;font-family:inherit}
+.btn-save:hover{background:var(--navy-2);transform:translateY(-1px)}
+.actions .btn-row{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
 .ts{font-size:11px;color:var(--muted);text-align:right}
 main{padding:20px;max-width:1500px;margin:0 auto}
 .tier{margin-bottom:28px}
@@ -123,7 +126,10 @@ main{padding:14px}
 <div class="subtitle">1Q 2026 (Jan&ndash;Mar 2026)</div>
 </div>
 <div class="actions">
-<label class="btn-load" for="fileInput">&#x1F504; Load / Refresh Data (Excel)</label>
+<div class="btn-row">
+ <label class="btn-load" for="fileInput">&#x1F504; Load Data</label>
+ <button class="btn-save" id="saveBtn" type="button">&#x1F4BE; Save</button>
+</div>
 <input id="fileInput" type="file" accept=".xlsx,.xls" style="display:none" />
 <div class="ts">Last updated: <span id="lastUpdated">&mdash;</span></div>
 </div>
@@ -873,6 +879,32 @@ document.addEventListener("click",(e)=>{
  if(tr){
   renderOpexModal(DATA);
   document.getElementById("opexModal").classList.add("open");
+ }
+});
+document.getElementById("saveBtn").addEventListener("click",()=>{
+ try{
+  const newBaseline = JSON.stringify(DATA);
+  let html = "<!doctype html>\n" + document.documentElement.outerHTML;
+  const marker = /const BASELINE_DATA\s*=\s*\{[\s\S]*?\};\s*let DATA/;
+  if(!marker.test(html)){
+   toast("\u26A0 Could not locate data block to save",true);
+   return;
+  }
+  html = html.replace(marker, "const BASELINE_DATA = " + newBaseline + ";\nlet DATA");
+  const blob = new Blob([html],{type:"text/html;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  const ts = new Date().toISOString().replace(/[:.]/g,"-").slice(0,19);
+  a.download = "Management_Dashboard_" + ts + ".html";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+  toast("\u2713 Saved as " + a.download);
+ }catch(err){
+  console.error(err);
+  toast("Save failed: " + err.message,true);
  }
 });
 document.getElementById("opexClose").addEventListener("click",()=>{
