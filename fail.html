@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Management Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    :root { --bg:#f5f7fb; --panel:#ffffff; --text:#0f172a; --muted:#64748b; --line:#e2e8f0; --soft:#F4F6F8; --office:#1d4ed8; --retail:#0f766e; --accent:#7c3aed; --good:#16a34a; --bad:#dc2626; }
+    html,body { background: var(--bg); color: var(--text); }
+    .panel { background:var(--panel); border:1px solid var(--line); border-radius:1rem; box-shadow: 0 6px 20px rgba(15,23,42,.06); }
+    .kpi { background:linear-gradient(180deg,#fff, #fbfdff); }
+    .table-wrap { overflow:auto; }
+    table { width:100%; border-collapse:separate; border-spacing:0; font-size:13px; }
+    thead th { position:sticky; top:0; z-index:1; background:#f8fafc; color:#334155; font-weight:600; border-bottom:1px solid var(--line); }
+    th, td { padding:10px 12px; border-bottom:1px solid #eef2f7; white-space:nowrap; }
+    tbody tr:hover { background:#fafcff; }
+    tbody tr.total-row, tbody tr.subtotal-row { background:var(--soft); font-weight:600; }
+    td.num, th.num { text-align:right; }
+    .pill { display:inline-flex; align-items:center; gap:.35rem; padding:.28rem .6rem; border-radius:999px; font-size:12px; font-weight:600; }
+    .pill-pos { background:#ecfdf3; color:#166534; }
+    .pill-neg { background:#fef2f2; color:#991b1b; }
+    .section-title { font-size:1rem; font-weight:700; letter-spacing:.01em; }
+    .muted { color:var(--muted); }
+    .chart-box { min-height:260px; }
+    .compact-table td, .compact-table th { padding:8px 10px; }
+    .legend-dot { width:10px; height:10px; border-radius:999px; display:inline-block; }
+    @media (max-width: 768px) {
+      .chart-box { min-height:220px; }
+      th, td { padding:8px 10px; font-size:12px; }
+    }
+  </style>
+</head>
+<body class="min-h-screen">
+  <script id="boot">window.__BOOTSTRAP_DATA__ = null;</script>
+  <div class="max-w-[1680px] mx-auto px-3 md:px-5 pb-8">
+    <header class="sticky top-0 z-40 backdrop-blur bg-[rgba(245,247,251,.9)] border-b border-slate-200/80 py-3 mb-4">
+      <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h1 class="text-2xl md:text-3xl font-bold tracking-tight">Management Dashboard</h1>
+          <div class="text-sm text-slate-500 mt-1">17-property REIT portfolio · Financial health · Leasing momentum · Tenant risk</div>
+        </div>
+        <div class="flex flex-col items-start md:items-end gap-2">
+          <div class="flex flex-wrap items-center gap-2">
+            <label class="inline-flex items-center cursor-pointer rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium shadow-sm hover:bg-slate-50">
+              <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" class="hidden" />
+              Load Data
+            </label>
+            <button id="saveBtn" class="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium shadow-sm hover:bg-slate-50">Save</button>
+            <span class="text-xs text-slate-500">Excel upload refreshes all visuals instantly</span>
+          </div>
+          <div id="lastUpdated" class="text-sm text-slate-500"></div>
+        </div>
+      </div>
+    </header>
+
+    <main class="space-y-4 md:space-y-5">
+      <!-- Tier 1 -->
+      <section class="grid grid-cols-1 xl:grid-cols-4 gap-4" id="tier1"></section>
+
+      <!-- Tier 2 -->
+      <section class="grid grid-cols-1 2xl:grid-cols-2 gap-4">
+        <div class="panel p-4">
+          <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-3">
+            <div>
+              <div class="section-title">Monthly P&amp;L (HK$M)</div>
+              <div class="muted text-sm">Actual · Budget · Variance %</div>
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="text-sm muted">Property</label>
+              <select id="plPropertyFilter" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"></select>
+            </div>
+          </div>
+          <div class="table-wrap max-h-[520px] rounded-2xl border border-slate-200">
+            <table id="plTable"></table>
+          </div>
+        </div>
+        <div class="panel p-4">
+          <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-3">
+            <div>
+              <div class="section-title">BME Breakdown (HK$M)</div>
+              <div class="muted text-sm">By items · Overall or selected property</div>
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="text-sm muted">Property</label>
+              <select id="bmePropertyFilter" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"></select>
+            </div>
+          </div>
+          <div class="table-wrap max-h-[520px] rounded-2xl border border-slate-200">
+            <table id="bmeTable"></table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tier 3 -->
+      <section class="grid grid-cols-1 xl:grid-cols-12 gap-4">
+        <div class="panel p-4 xl:col-span-4">
+          <div class="section-title mb-1">Leasing Activity</div>
+          <div class="muted text-sm mb-3">Pipeline, renewals, new lettings and area</div>
+          <div class="table-wrap max-h-[350px] rounded-2xl border border-slate-200">
+            <table id="leasingTable" class="compact-table"></table>
+          </div>
+        </div>
+        <div class="panel p-4 xl:col-span-4">
+          <div class="section-title mb-1">Reversion</div>
+          <div class="muted text-sm mb-3">Overall and by segment</div>
+          <div class="chart-box"><canvas id="reversionChart"></canvas></div>
+        </div>
+        <div class="panel p-4 xl:col-span-4">
+          <div class="section-title mb-1">Occupancy Trend</div>
+          <div class="muted text-sm mb-3">Overall, office and retail</div>
+          <div class="chart-box"><canvas id="occupancyChart"></canvas></div>
+        </div>
+        <div class="panel p-4 xl:col-span-12">
+          <div class="section-title mb-1">Expiry Profile</div>
+          <div class="muted text-sm mb-3">Area or rental income maturing by year</div>
+          <div class="chart-box"><canvas id="expiryChart"></canvas></div>
+        </div>
+      </section>
+
+      <!-- Tier 4 -->
+      <section class="panel p-4">
+        <div class="section-title mb-1">NPI + DPU</div>
+        <div class="muted text-sm mb-3">Net property income and distribution per unit</div>
+        <div class="chart-box min-h-[320px]"><canvas id="npiDpuChart"></canvas></div>
+      </section>
+
+      <!-- Tier 5 -->
+      <section class="panel p-4">
+        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-3">
+          <div>
+            <div class="section-title">Tenant Sales</div>
+            <div class="muted text-sm">Filter across 8 trade categories</div>
+          </div>
+          <div class="flex items-center gap-2">
+            <label class="text-sm muted">Trade Category</label>
+            <select id="tradeFilter" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"></select>
+          </div>
+        </div>
+        <div class="table-wrap max-h-[460px] rounded-2xl border border-slate-200">
+          <table id="salesTable"></table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+<script>
+const currency = new Intl.NumberFormat('en-US', { maximumFractionDigits: 1, minimumFractionDigits: 1 });
+const pct1 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 1, minimumFractionDigits: 1 });
+const pct0 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0, minimumFractionDigits: 0 });
+
+const tradeCategories = ['All categories','Food & Beverage','Supermarket','Lifestyle','Fashion & Accessories','Health & Beauty','Services','Entertainment','Others'];
+const propertyNames = Array.from({length:17}, (_,i)=>`Property ${i+1}`);
+
+function deepClone(obj){ return JSON.parse(JSON.stringify(obj)); }
+function fmtNum(v){ return (v===null || v===undefined || Number.isNaN(Number(v))) ? '—' : currency.format(Number(v)); }
+function fmtPct(v, d=1){ return (v===null || v===undefined || Number.isNaN(Number(v))) ? '—' : `${d===0?pct0.format(Number(v)):pct1.format(Number(v))}%`; }
+function lastUpdatedText(state){
+  const source = state.meta?.sourceName ? ` · ${state.meta.sourceName}` : '';
+  return `Last updated: ${new Date(state.meta.updatedAt || Date.now()).toLocaleString()}${source}`;
+}
+function safeLower(v){ return String(v ?? '').trim().toLowerCase(); }
+function num(v){ if (typeof v === 'number') return v; const s = String(v ?? '').replace(/[$,%(),\s]/g,'').replace(/—/g,''); if(!s) return 0; const n = Number(s); return Number.isFinite(n) ? n : 0; }
+function byKey(rows, keys){ const map={}; rows.forEach(r=>{ const k = keys.map(key=>safeLower(r[key])).join('|'); map[k]=r; }); return map; }
+function slug(s){ return safeLower(s).replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,''); }
+function inferSheetName(workbook, choices){ const names = workbook.SheetNames; const norm = names.map(n=>({raw:n, low:n.toLowerCase()}));
+  for (const choice of choices){ const c=choice.toLowerCase(); const found = norm.find(n=>n.low.includes(c)); if(found) return found.raw; }
+  return null;
+}
+
+function starterData(){
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const plTemplate = [
+    'Revenue','Property operating expenses','Other OPEX','Total property operating expenses','Net Property Income (NPI)','Margin'
+  ];
+  const monthlyPL = {};
+  ['All properties', ...propertyNames].forEach((p, idx)=>{
+    monthlyPL[p] = months.map((m, mi)=>{
+      const rev = 145 + mi*2.8 + (idx>0 ? (idx%6-2)*1.5 : 0);
+      const opex = 28 + mi*0.6 + (idx>0 ? (idx%5)*0.4 : 0);
+      const other = 16 + ((mi+idx)%4)*0.6;
+      const total = opex + other;
+      const npi = rev - total;
+      const budgetRev = rev * (0.98 + ((mi+1)%3)*0.01);
+      const budgetOpex = total * (1.01 - (mi%2)*0.005);
+      const budgetNpi = budgetRev - budgetOpex;
+      const margin = (npi/rev)*100;
+      const budgetMargin = (budgetNpi/budgetRev)*100;
+      return {
+        month:m,
+        rows: plTemplate.map(label=>{
+          let actual=0, budget=0;
+          if(label==='Revenue'){ actual=rev; budget=budgetRev; }
+          if(label==='Property operating expenses'){ actual=opex; budget=opex*1.01; }
+          if(label==='Other OPEX'){ actual=other; budget=other*0.99; }
+          if(label==='Total property operating expenses'){ actual=total; budget=budgetOpex; }
+          if(label==='Net Property Income (NPI)'){ actual=npi; budget=budgetNpi; }
+          if(label==='Margin'){ actual=margin; budget=budgetMargin; }
+          const variancePct = budget===0?0:((actual-budget)/Math.abs(budget))*100;
+          return { lineItem:label, actual, budget, variancePct, isPercent: label==='Margin', style:['Revenue','Total property operating expenses','Net Property Income (NPI)'].includes(label)?'total':'normal' };
+        })
+      };
+    });
+  });
+
+  const bmeRows = ['Base rent','Management fee','Air-conditioning','Promotion levy','Government rent and rates','Property management fee','Marketing fee','Repairs & maintenance','Utilities','Car park operating costs','Other'];
+  const bmeBreakdown = {};
+  ['All properties', ...propertyNames].forEach((p, idx)=>{
+    bmeBreakdown[p] = bmeRows.map((item, i)=>({
+      item,
+      office: 20 + idx*0.6 + i*0.8,
+      retail: 14 + idx*0.4 + i*0.65,
+      total: 34 + idx + i*1.45
+    }));
+  });
+
+  const leasing = propertyNames.map((p, i)=>({
+    property:p,
+    sector: i<10?'Office':'Retail',
+    renewals: 2 + (i%4),
+    newLettings: 1 + (i%3),
+    pipeline: 3 + (i%5),
+    areaKsqft: 8 + i*1.4,
+    occupancy: 87 + (i%7)*1.4,
+  }));
+
+  const reversion = [
+    {label:'Overall', value:6.8},
+    {label:'Office', value:4.9},
+    {label:'Retail', value:9.6},
+  ];
+
+  const occupancy = months.map((m,i)=>({ month:m, overall: 92.1 + Math.sin(i/2)*1.2, office: 90.5 + Math.sin(i/2.2)*1.1, retail: 94 + Math.cos(i/2.4)*1.0 }));
+  const expiry = [2026,2027,2028,2029,2030,'2031+'].map((y,i)=>({ year:String(y), office: 12+i*3, retail: 8+(5-i)*2 }));
+  const npiDpu = months.map((m,i)=>({ month:m, npi: 98 + i*2.2 + Math.sin(i/2)*2, dpu: 18.2 + i*.18 + Math.cos(i/3)*.25 }));
+
+  const categories = tradeCategories.slice(1);
+  const tenantSales = Array.from({length:32}, (_,i)=>({
+    tenant:`Tenant ${i+1}`,
+    property:propertyNames[i%17],
+    tradeCategory: categories[i%categories.length],
+    mtdSales: 0.8 + i*0.17,
+    ytdSales: 5 + i*0.62,
+    yoyPct: -6 + (i%12)*2.3,
+    psf: 56 + (i%10)*7,
+    occupancyCostPct: 10 + (i%8)*1.4,
+  }));
+
+  const executive = {
+    revenue:{ value: 1732.4, yoyPct: 4.8, office: 1048.2, retail: 684.2 },
+    opex:{ value: 516.1, yoyPct: 3.1, office: 315.8, retail: 200.3 },
+    npi:{ value: 1216.3, yoyPct: 5.6, office: 732.4, retail: 483.9 },
+    margin:{ value: 70.2, yoyPct: 0.6, office: 69.9, retail: 70.7 },
+  };
+
+  return {
+    meta: { updatedAt: Date.now(), sourceName: 'Sample data' },
+    executive, monthlyPL, bmeBreakdown, leasing, reversion, occupancy, expiry, npiDpu, tenantSales,
+  };
+}
+
+let state = window.__BOOTSTRAP_DATA__ || starterData();
+let charts = {};
+
+function aggregateExecutiveFromPL(){
+  const months = state.monthlyPL['All properties'] || [];
+  const sumByItem = name => months.reduce((acc, m)=>{
+    const row = m.rows.find(r=>r.lineItem===name); acc.actual += num(row?.actual); acc.budget += num(row?.budget); return acc;
+  }, {actual:0,budget:0});
+  const revenue = sumByItem('Revenue').actual;
+  const opex = sumByItem('Total property operating expenses').actual;
+  const npi = sumByItem('Net Property Income (NPI)').actual;
+  const margin = revenue ? (npi/revenue)*100 : 0;
+  const revenueBudget = sumByItem('Revenue').budget;
+  const opexBudget = sumByItem('Total property operating expenses').budget;
+  const npiBudget = sumByItem('Net Property Income (NPI)').budget;
+  const marginBudget = revenueBudget ? (npiBudget/revenueBudget)*100 : 0;
+
+  const officeSplit = state.leasing.filter(x=>x.sector==='Office').length / state.leasing.length;
+  const retailSplit = 1-officeSplit;
+  state.executive = {
+    revenue:{ value: revenue, yoyPct: revenueBudget?((revenue-revenueBudget)/Math.abs(revenueBudget))*100:0, office: revenue*officeSplit, retail: revenue*retailSplit },
+    opex:{ value: opex, yoyPct: opexBudget?((opex-opexBudget)/Math.abs(opexBudget))*100:0, office: opex*officeSplit, retail: opex*retailSplit },
+    npi:{ value: npi, yoyPct: npiBudget?((npi-npiBudget)/Math.abs(npiBudget))*100:0, office: npi*officeSplit, retail: npi*retailSplit },
+    margin:{ value: margin, yoyPct: marginBudget?(margin-marginBudget):0, office: margin*0.996, retail: margin*1.008 },
+  };
+}
+
+function renderExecutive(){
+  const tier1 = document.getElementById('tier1');
+  const cards = [
+    ['Revenue','HK$M', state.executive.revenue, false],
+    ['Opex','HK$M', state.executive.opex, false],
+    ['NPI','HK$M', state.executive.npi, false],
+    ['Margin','%', state.executive.margin, true]
+  ];
+  tier1.innerHTML = cards.map(([title,unit,obj,isPct],i)=>{
+    const delta = Number(obj.yoyPct || 0);
+    const deltaCls = delta >= 0 ? 'pill-pos':'pill-neg';
+    const splitOffice = isPct ? fmtPct(obj.office,1) : fmtNum(obj.office);
+    const splitRetail = isPct ? fmtPct(obj.retail,1) : fmtNum(obj.retail);
+    const value = isPct ? fmtPct(obj.value,1) : fmtNum(obj.value);
+    return `
+      <div class="panel kpi p-4">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <div class="text-sm text-slate-500">${title}</div>
+            <div class="text-3xl font-bold mt-2">${value}${isPct ? '' : ''}</div>
+          </div>
+          <span class="pill ${deltaCls}">${delta>=0?'▲':'▼'} ${Math.abs(delta).toFixed(isPct?1:1)}${isPct?'ppt':'%'}</span>
+        </div>
+        <div class="mt-4 grid grid-cols-2 gap-2 text-sm">
+          <div class="rounded-2xl bg-slate-50 px-3 py-2">
+            <div class="flex items-center gap-2 text-slate-500"><span class="legend-dot" style="background:var(--office)"></span>Office</div>
+            <div class="font-semibold mt-1">${splitOffice}</div>
+          </div>
+          <div class="rounded-2xl bg-slate-50 px-3 py-2">
+            <div class="flex items-center gap-2 text-slate-500"><span class="legend-dot" style="background:var(--retail)"></span>Retail</div>
+            <div class="font-semibold mt-1">${splitRetail}</div>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function updatePropertyFilters(){
+  const options = ['All properties', ...propertyNames].map(p=>`<option value="${p}">${p}</option>`).join('');
+  ['plPropertyFilter','bmePropertyFilter'].forEach(id=>{
+    const el = document.getElementById(id);
+    const current = el.value || 'All properties';
+    el.innerHTML = options;
+    el.value = state.monthlyPL[current] ? current : 'All properties';
+  });
+  const trade = document.getElementById('tradeFilter');
+  const currentTrade = trade.value || 'All categories';
+  trade.innerHTML = tradeCategories.map(c=>`<option value="${c}">${c}</option>`).join('');
+  trade.value = tradeCategories.includes(currentTrade) ? currentTrade : 'All categories';
+}
+
+function buildPLTable(){
+  const property = document.getElementById('plPropertyFilter').value || 'All properties';
+  const data = state.monthlyPL[property] || state.monthlyPL['All properties'] || [];
+  const table = document.getElementById('plTable');
+  if(!data.length){ table.innerHTML = '<tbody><tr><td class="p-4">No data.</td></tr></tbody>'; return; }
+  const lineItems = data[0].rows.map(r=>r.lineItem);
+  let thead = '<thead><tr><th>Line item</th>';
+  data.forEach(m=>{ thead += `<th class="num">${m.month} A</th><th class="num">${m.month} B</th><th class="num">${m.month} Var %</th>`; });
+  thead += '</tr></thead>';
+  let body = '<tbody>';
+  lineItems.forEach(item=>{
+    const row0 = data[0].rows.find(r=>r.lineItem===item);
+    const cls = row0?.style==='total' ? 'total-row' : '';
+    body += `<tr class="${cls}"><td>${item}</td>`;
+    data.forEach(m=>{
+      const r = m.rows.find(x=>x.lineItem===item) || {};
+      body += `<td class="num">${r.isPercent ? fmtPct(r.actual,1) : fmtNum(r.actual)}</td>`;
+      body += `<td class="num">${r.isPercent ? fmtPct(r.budget,1) : fmtNum(r.budget)}</td>`;
+      body += `<td class="num">${fmtPct(r.variancePct,1)}</td>`;
+    });
+    body += '</tr>';
+  });
+  body += '</tbody>';
+  table.innerHTML = thead + body;
+}
+
+function buildBMETable(){
+  const property = document.getElementById('bmePropertyFilter').value || 'All properties';
+  const rows = state.bmeBreakdown[property] || [];
+  const table = document.getElementById('bmeTable');
+  let body = rows.map(r=>`<tr${['Base rent','Total'].includes(r.item)?' class="subtotal-row"':''}><td>${r.item}</td><td class="num">${fmtNum(r.office)}</td><td class="num">${fmtNum(r.retail)}</td><td class="num">${fmtNum(r.total)}</td></tr>`).join('');
+  const total = rows.reduce((a,r)=>({office:a.office+num(r.office), retail:a.retail+num(r.retail), total:a.total+num(r.total)}),{office:0,retail:0,total:0});
+  body += `<tr class="total-row"><td>Total</td><td class="num">${fmtNum(total.office)}</td><td class="num">${fmtNum(total.retail)}</td><td class="num">${fmtNum(total.total)}</td></tr>`;
+  table.innerHTML = `<thead><tr><th>Item</th><th class="num">Office</th><th class="num">Retail</th><th class="num">Total</th></tr></thead><tbody>${body}</tbody>`;
+}
+
+function buildLeasingTable(){
+  const rows = state.leasing || [];
+  const body = rows.map(r=>`<tr><td>${r.property}</td><td>${r.sector}</td><td class="num">${r.renewals}</td><td class="num">${r.newLettings}</td><td class="num">${r.pipeline}</td><td class="num">${fmtNum(r.areaKsqft)}</td><td class="num">${fmtPct(r.occupancy,1)}</td></tr>`).join('');
+  document.getElementById('leasingTable').innerHTML = `<thead><tr><th>Property</th><th>Sector</th><th class="num">Renewals</th><th class="num">New</th><th class="num">Pipeline</th><th class="num">Area (k sq ft)</th><th class="num">Occ.</th></tr></thead><tbody>${body}</tbody>`;
+}
+
+function buildSalesTable(){
+  const trade = document.getElementById('tradeFilter').value || 'All categories';
+  const rows = (state.tenantSales || []).filter(r=>trade==='All categories' || r.tradeCategory===trade);
+  const body = rows.map(r=>`<tr><td>${r.tenant}</td><td>${r.property}</td><td>${r.tradeCategory}</td><td class="num">${fmtNum(r.mtdSales)}</td><td class="num">${fmtNum(r.ytdSales)}</td><td class="num">${fmtPct(r.yoyPct,1)}</td><td class="num">${fmtNum(r.psf)}</td><td class="num">${fmtPct(r.occupancyCostPct,1)}</td></tr>`).join('');
+  document.getElementById('salesTable').innerHTML = `<thead><tr><th>Tenant</th><th>Property</th><th>Trade Category</th><th class="num">MTD Sales</th><th class="num">YTD Sales</th><th class="num">YoY %</th><th class="num">Sales PSF</th><th class="num">Occ. Cost %</th></tr></thead><tbody>${body}</tbody>`;
+}
+
+function destroyCharts(){ Object.values(charts).forEach(c=>c?.destroy?.()); charts={}; }
+function buildCharts(){
+  destroyCharts();
+  charts.reversion = new Chart(document.getElementById('reversionChart'), {
+    type:'bar', data:{ labels:state.reversion.map(x=>x.label), datasets:[{ label:'Reversion %', data:state.reversion.map(x=>x.value), backgroundColor:['#334155','var(--office)','var(--retail)'], borderRadius:10 }] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false} }, scales:{ y:{ ticks:{ callback:v=>v+'%' }}}}
+  });
+  charts.occupancy = new Chart(document.getElementById('occupancyChart'), {
+    type:'line', data:{ labels:state.occupancy.map(x=>x.month), datasets:[
+      {label:'Overall', data:state.occupancy.map(x=>x.overall), borderColor:'#334155', backgroundColor:'#334155', tension:.35 },
+      {label:'Office', data:state.occupancy.map(x=>x.office), borderColor:'#1d4ed8', backgroundColor:'#1d4ed8', tension:.35 },
+      {label:'Retail', data:state.occupancy.map(x=>x.retail), borderColor:'#0f766e', backgroundColor:'#0f766e', tension:.35 },
+    ]}, options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false}, plugins:{ legend:{position:'bottom'} }, scales:{ y:{ ticks:{ callback:v=>v+'%' }, suggestedMin:80, suggestedMax:100 }}} });
+  charts.expiry = new Chart(document.getElementById('expiryChart'), {
+    type:'bar', data:{ labels:state.expiry.map(x=>x.year), datasets:[
+      {label:'Office', data:state.expiry.map(x=>x.office), backgroundColor:'#1d4ed8', borderRadius:8, stack:'a'},
+      {label:'Retail', data:state.expiry.map(x=>x.retail), backgroundColor:'#0f766e', borderRadius:8, stack:'a'},
+    ]}, options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{position:'bottom'} }, scales:{ x:{ stacked:true }, y:{ stacked:true } } } });
+  charts.npiDpu = new Chart(document.getElementById('npiDpuChart'), {
+    data:{ labels:state.npiDpu.map(x=>x.month), datasets:[
+      { type:'bar', label:'NPI (HK$M)', data:state.npiDpu.map(x=>x.npi), backgroundColor:'#1d4ed8', borderRadius:8, yAxisID:'y' },
+      { type:'line', label:'DPU (HK cents)', data:state.npiDpu.map(x=>x.dpu), borderColor:'#7c3aed', backgroundColor:'#7c3aed', tension:.35, yAxisID:'y1' },
+    ]}, options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{position:'bottom'} }, scales:{ y:{ position:'left' }, y1:{ position:'right', grid:{drawOnChartArea:false}} } });
+}
+
+function render(){
+  aggregateExecutiveFromPL();
+  document.getElementById('lastUpdated').textContent = lastUpdatedText(state);
+  updatePropertyFilters();
+  renderExecutive();
+  buildPLTable();
+  buildBMETable();
+  buildLeasingTable();
+  buildSalesTable();
+  buildCharts();
+}
+
+function rowsFromSheet(ws){ return XLSX.utils.sheet_to_json(ws, { defval: null }); }
+function parseByKnownSheets(workbook, sourceName){
+  const next = deepClone(state);
+  const sheetMap = {
+    executive: inferSheetName(workbook, ['executive','summary','tier1']),
+    pl: inferSheetName(workbook, ['monthly p&l','monthly pl','p&l','pl']),
+    bme: inferSheetName(workbook, ['bme']),
+    leasing: inferSheetName(workbook, ['leasing']),
+    reversion: inferSheetName(workbook, ['reversion']),
+    occupancy: inferSheetName(workbook, ['occupancy']),
+    expiry: inferSheetName(workbook, ['expiry','expiration']),
+    npiDpu: inferSheetName(workbook, ['npi','dpu']),
+    sales: inferSheetName(workbook, ['tenant sales','sales'])
+  };
+
+  if (sheetMap.executive){
+    const rows = rowsFromSheet(workbook.Sheets[sheetMap.executive]);
+    const out = {};
+    rows.forEach(r=>{
+      const metric = r.metric || r.Metric || r.KPI || r.kpi;
+      if(!metric) return;
+      const key = slug(metric);
+      out[key] = { value:num(r.value||r.actual||r.Actual), yoyPct:num(r.yoy||r.yoy_pct||r['YoY %']||r['Variance %']), office:num(r.office||r.Office), retail:num(r.retail||r.Retail) };
+    });
+    if(out.revenue && out.opex && out.npi && out.margin){ next.executive = out; }
+  }
+
+  if (sheetMap.pl){
+    const rows = rowsFromSheet(workbook.Sheets[sheetMap.pl]);
+    const propKey = Object.keys(rows[0] || {}).find(k=>safeLower(k).includes('property'));
+    const monthKey = Object.keys(rows[0] || {}).find(k=>['month','period'].includes(safeLower(k)) || safeLower(k).includes('month'));
+    const itemKey = Object.keys(rows[0] || {}).find(k=>safeLower(k).includes('line') || safeLower(k).includes('item'));
+    const actualKey = Object.keys(rows[0] || {}).find(k=>['actual','a'].includes(safeLower(k)) || safeLower(k).includes('actual'));
+    const budgetKey = Object.keys(rows[0] || {}).find(k=>['budget','b'].includes(safeLower(k)) || safeLower(k).includes('budget'));
+    const varKey = Object.keys(rows[0] || {}).find(k=>safeLower(k).includes('var'));
+    if (propKey && monthKey && itemKey && actualKey && budgetKey){
+      const grouped = {};
+      rows.forEach(r=>{
+        const p = r[propKey] || 'All properties'; const m=r[monthKey] || 'Period';
+        grouped[p] = grouped[p] || {};
+        grouped[p][m] = grouped[p][m] || { month:m, rows:[] };
+        const item = String(r[itemKey]);
+        grouped[p][m].rows.push({ lineItem:item, actual:num(r[actualKey]), budget:num(r[budgetKey]), variancePct: varKey ? num(r[varKey]) : (num(r[budgetKey]) ? ((num(r[actualKey])-num(r[budgetKey]))/Math.abs(num(r[budgetKey])))*100 : 0), isPercent: safeLower(item).includes('margin') || safeLower(item).includes('%'), style:['revenue','total property operating expenses','net property income (npi)','npi'].includes(safeLower(item))?'total':'normal' });
+      });
+      next.monthlyPL = {};
+      Object.keys(grouped).forEach(p=> next.monthlyPL[p] = Object.values(grouped[p]));
+      if(!next.monthlyPL['All properties']){
+        const allMap = {};
+        Object.entries(next.monthlyPL).forEach(([p, periods])=>{
+          if(p==='All properties') return;
+          periods.forEach(per=>{
+            allMap[per.month] = allMap[per.month] || {month:per.month, rows:[]};
+            per.rows.forEach(r=>{
+              let target = allMap[per.month].rows.find(x=>x.lineItem===r.lineItem);
+              if(!target){ target={...r}; allMap[per.month].rows.push(target); }
+              else { target.actual += r.actual; target.budget += r.budget; target.variancePct = target.budget ? ((target.actual-target.budget)/Math.abs(target.budget))*100 : 0; }
+            });
+          });
+        });
+        next.monthlyPL['All properties'] = Object.values(allMap);
+      }
+    }
+  }
+
+  if (sheetMap.bme){
+    const rows = rowsFromSheet(workbook.Sheets[sheetMap.bme]);
+    const propKey = Object.keys(rows[0] || {}).find(k=>safeLower(k).includes('property'));
+    const itemKey = Object.keys(rows[0] || {}).find(k=>safeLower(k).includes('item') || safeLower(k).includes('line'));
+    const officeKey = Object.keys(rows[0] || {}).find(k=>safeLower(k)==='office' || safeLower(k).includes('office'));
+    const retailKey = Object.keys(rows[0] || {}).find(k=>safeLower(k)==='retail' || safeLower(k).includes('retail'));
+    const totalKey = Object.keys(rows[0] || {}).find(k=>safeLower(k)==='total' || safeLower(k).includes('total'));
+    if(propKey && itemKey && officeKey && retailKey){
+      const grouped = {};
+      rows.forEach(r=>{ const p=r[propKey]||'All properties'; grouped[p]=grouped[p]||[]; grouped[p].push({ item:r[itemKey], office:num(r[officeKey]), retail:num(r[retailKey]), total: totalKey ? num(r[totalKey]) : num(r[officeKey])+num(r[retailKey]) }); });
+      next.bmeBreakdown = grouped;
+    }
+  }
+
+  if (sheetMap.leasing){
+    const rows = rowsFromSheet(workbook.Sheets[sheetMap.leasing]);
+    if(rows.length) next.leasing = rows.map(r=>({ property:r.property||r.Property, sector:r.sector||r.Sector, renewals:num(r.renewals||r.Renewals), newLettings:num(r.newLettings||r['New Lettings']||r.new), pipeline:num(r.pipeline||r.Pipeline), areaKsqft:num(r.areaKsqft||r.Area||r['Area (k sq ft)']), occupancy:num(r.occupancy||r.Occupancy) }));
+  }
+  if (sheetMap.reversion){
+    const rows = rowsFromSheet(workbook.Sheets[sheetMap.reversion]);
+    if(rows.length) next.reversion = rows.map(r=>({ label:r.label||r.Label||r.segment||r.Segment, value:num(r.value||r.Value||r.reversion||r.Reversion) }));
+  }
+  if (sheetMap.occupancy){
+    const rows = rowsFromSheet(workbook.Sheets[sheetMap.occupancy]);
+    if(rows.length) next.occupancy = rows.map(r=>({ month:r.month||r.Month||r.period||r.Period, overall:num(r.overall||r.Overall), office:num(r.office||r.Office), retail:num(r.retail||r.Retail) }));
+  }
+  if (sheetMap.expiry){
+    const rows = rowsFromSheet(workbook.Sheets[sheetMap.expiry]);
+    if(rows.length) next.expiry = rows.map(r=>({ year:String(r.year||r.Year||r.bucket||r.Bucket), office:num(r.office||r.Office), retail:num(r.retail||r.Retail) }));
+  }
+  if (sheetMap.npiDpu){
+    const rows = rowsFromSheet(workbook.Sheets[sheetMap.npiDpu]);
+    if(rows.length) next.npiDpu = rows.map(r=>({ month:r.month||r.Month||r.period||r.Period, npi:num(r.npi||r.NPI), dpu:num(r.dpu||r.DPU) }));
+  }
+  if (sheetMap.sales){
+    const rows = rowsFromSheet(workbook.Sheets[sheetMap.sales]);
+    if(rows.length) next.tenantSales = rows.map((r,i)=>({ tenant:r.tenant||r.Tenant||`Tenant ${i+1}`, property:r.property||r.Property||'Property 1', tradeCategory:r.tradeCategory||r['Trade Category']||r.Category||'Others', mtdSales:num(r.mtdSales||r['MTD Sales']), ytdSales:num(r.ytdSales||r['YTD Sales']), yoyPct:num(r.yoyPct||r['YoY %']), psf:num(r.psf||r['Sales PSF']||r.salesPsf), occupancyCostPct:num(r.occupancyCostPct||r['Occupancy Cost %']) }));
+  }
+
+  next.meta = { updatedAt: Date.now(), sourceName };
+  state = next;
+  render();
+}
+
+function handleFile(file){
+  const reader = new FileReader();
+  reader.onload = e => {
+    const data = new Uint8Array(e.target.result);
+    const wb = XLSX.read(data, { type:'array' });
+    parseByKnownSheets(wb, file.name);
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function saveHTML(){
+  const cloned = document.documentElement.cloneNode(true);
+  const boot = cloned.querySelector('#boot');
+  if (boot) boot.textContent = `window.__BOOTSTRAP_DATA__ = ${JSON.stringify(state)};`;
+  const blob = new Blob(['<!DOCTYPE html>\n' + cloned.outerHTML], {type:'text/html;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'index.html';
+  document.body.appendChild(a);
+  a.click();
+  URL.revokeObjectURL(a.href);
+  a.remove();
+}
+
+function bind(){
+  document.getElementById('fileInput').addEventListener('change', e=>{ const f=e.target.files?.[0]; if(f) handleFile(f); });
+  document.getElementById('saveBtn').addEventListener('click', saveHTML);
+  document.getElementById('plPropertyFilter').addEventListener('change', buildPLTable);
+  document.getElementById('bmePropertyFilter').addEventListener('change', buildBMETable);
+  document.getElementById('tradeFilter').addEventListener('change', buildSalesTable);
+}
+
+render();
+bind();
+</script>
+</body>
+</html>
