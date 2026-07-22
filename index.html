@@ -1,34 +1,562 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hello World</title>
-    <style>
-        /* Reset default margins */
-        body, html {
-            margin: 0;
-            padding: 0;
-            height: 100%;
-        }
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>HK Weather — District Temperature &amp; Rainfall Dashboard</title>
+<meta name="description" content="Live Hong Kong weather operations dashboard: district temperatures, rainfall map, and an interactive wind map, sourced from the Hong Kong Observatory Open Data API." />
 
-        /* Use Flexbox to center the content */
-        body {
-            display: flex;
-            justify-content: center; /* Centers horizontally */
-            align-items: center;     /* Centers vertically */
-            background-color: #f4f4f9; /* Optional: adds a light background color */
-            font-family: Arial, sans-serif;
-        }
+<!-- Tailwind CSS via CDN -->
+<script src="https://cdn.tailwindcss.com"></script>
+<!-- Leaflet CSS + JS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<!-- Font: JetBrains Mono for data, Inter for UI -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-        h1 {
-            color: #333; /* Optional: sets the text color */
-        }
-    </style>
+<style>
+  :root{
+    --bg:            #0b1220;
+    --panel:         #111a2c;
+    --panel-2:       #16223a;
+    --border:        #223252;
+    --border-soft:   #1a2740;
+    --text:          #e7ecf7;
+    --text-muted:    #8b9ab0;
+    --text-faint:    #5c6d87;
+    --accent:        #35d0f4;
+    --accent-2:      #ff9a3d;
+    --accent-warn:   #ff5470;
+    --font-body: 'Inter', -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background: radial-gradient(circle at top left, #101c34 0%, var(--bg) 55%);
+    color: var(--text);
+    font-family: var(--font-body);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono{font-family: var(--font-mono);}
+
+  /* ---------- App bar ---------- */
+  .app-bar{
+    display:flex; align-items:center; justify-content:space-between;
+    gap: 12px;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border-soft);
+    background: rgba(11,18,32,0.85);
+    backdrop-filter: blur(8px);
+    position: sticky; top:0; z-index: 40;
+    flex-wrap: wrap;
+  }
+  .brand{ display:flex; align-items:center; gap:10px; min-width:0; }
+  .brand-mark{
+    width:34px; height:34px; border-radius:8px;
+    flex-shrink:0;
+    background: linear-gradient(135deg, var(--accent), #1670a8);
+    display:flex; align-items:center; justify-content:center;
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.08) inset, 0 4px 14px rgba(53,208,244,0.25);
+  }
+  .brand h1{
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    line-height:1.1;
+    white-space: nowrap;
+  }
+  .brand h1 span{ color: var(--accent); }
+  .brand p{ font-size: 11px; color: var(--text-muted); margin-top:2px; letter-spacing:0.04em; white-space:nowrap; }
+
+  .status-cluster{ display:flex; align-items:center; gap:16px; flex-wrap:wrap; justify-content:flex-end; }
+
+  @media (max-width: 560px){
+    .app-bar{ padding: 12px 14px; }
+    .brand h1{ font-size: 12.5px; }
+    .brand p{ font-size: 9.5px; }
+    .status-cluster{ gap:8px; }
+    .status-pill{ font-size: 9.5px; padding: 5px 8px; }
+  }
+  .status-pill{
+    display:flex; align-items:center; gap:7px;
+    font-size:11px; color: var(--text-muted);
+    background: var(--panel-2); border:1px solid var(--border);
+    padding: 6px 10px; border-radius: 999px;
+    white-space: nowrap;
+  }
+  .status-pill b{ color: var(--text); font-weight:600; letter-spacing: 0.02em; }
+  .dot{ width:7px; height:7px; border-radius:999px; background:#37d67a; box-shadow:0 0 0 3px rgba(55,214,122,0.15); }
+  .dot.live{ animation: pulse 2s infinite; }
+  @keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:.35;} }
+
+  /* ---------- Layout ---------- */
+  .shell{ padding: 14px 16px 20px; max-width: 1600px; margin: 0 auto; }
+  .grid-main{
+    display:grid;
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  @media (min-width: 1024px){
+    .grid-main{ grid-template-columns: 1.15fr 1fr; align-items: stretch; }
+  }
+
+  .widget{
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    display:flex; flex-direction:column;
+    overflow:hidden;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.02) inset, 0 12px 24px -12px rgba(0,0,0,0.5);
+  }
+  .widget-header{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-soft);
+    flex-wrap: wrap;
+  }
+  .widget-title{
+    display:flex; align-items:center; gap:9px;
+    font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em;
+    color: var(--text-muted);
+  }
+  .widget-title .bar{ width:3px; height:14px; border-radius:2px; background: var(--accent); }
+  .widget-title.warn .bar{ background: var(--accent-warn); }
+  .widget-sub{ font-size:11px; color: var(--text-faint); }
+
+  /* ---------- Map panels (temperature + rainfall) ---------- */
+  .map-panel{ position:relative; flex:1; min-height: 400px; }
+  #tempMap, #rainMap{ position:absolute; top:0; left:0; right:0; bottom:0; background:#0d1524; }
+  .leaflet-container{ font-family: var(--font-body); background:#0d1524 !important; }
+
+  .legend-card{
+    position:absolute; bottom:10px; left:10px; z-index:500;
+    background: rgba(11,18,32,0.88);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding: 8px 10px;
+    font-size:10.5px;
+    color: var(--text-muted);
+    backdrop-filter: blur(6px);
+  }
+  .legend-card .row{ display:flex; align-items:center; gap:6px; margin-top:4px; }
+  .legend-card .row:first-child{ margin-top:0; }
+  .swatch{ width:11px; height:11px; border-radius:3px; flex-shrink:0; }
+
+  .temp-marker{
+    display:flex; align-items:center; justify-content:center;
+    width:36px; height:36px;
+    border-radius: 50% 50% 50% 4px;
+    transform: rotate(-45deg);
+    border: 2px solid rgba(255,255,255,0.85);
+    box-shadow: 0 3px 10px rgba(0,0,0,0.55);
+    font-weight:700; font-size:12.5px; color:#0b1220;
+    font-family: var(--font-mono);
+  }
+  .temp-marker span{ transform: rotate(45deg); }
+
+  .rain-marker{
+    display:flex; align-items:center; justify-content:center;
+    border-radius: 50%;
+    border: 1.5px solid rgba(255,255,255,0.5);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.45);
+    font-family: var(--font-mono); font-weight:700; font-size:11px;
+    color:#fff;
+  }
+
+  /* ---------- Summary strip inside temp panel header ---------- */
+  .summary-strip{ display:flex; gap:10px; flex-wrap:wrap; }
+  .summary-chip{
+    display:flex; flex-direction:column; align-items:flex-start;
+    background: var(--panel-2); border:1px solid var(--border);
+    border-radius:9px; padding:6px 10px; min-width:74px;
+  }
+  .summary-chip .lbl{ font-size:9.5px; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.06em; }
+  .summary-chip .val{ font-family: var(--font-mono); font-size:15px; font-weight:700; color: var(--accent); }
+  .summary-chip .val small{ font-size:10px; color: var(--text-muted); font-weight:500; }
+
+  /* ---------- Alert ticker (compact, inside temp header) ---------- */
+  .alert-ticker{
+    margin: 0 16px 12px;
+    background: rgba(255,84,112,0.08);
+    border: 1px solid rgba(255,84,112,0.35);
+    border-radius: 9px;
+    padding: 9px 12px;
+    font-size: 12px;
+    color: #ffb4c2;
+    line-height: 1.5;
+    display:none;
+  }
+  .alert-ticker.show{ display:flex; gap:8px; align-items:flex-start; }
+  .alert-ticker .ico{ flex-shrink:0; margin-top:1px; }
+
+  /* ---------- Bottom Windy panel ---------- */
+  .windy-panel{ position:relative; width:100%; }
+  .windy-frame-wrap{ position:relative; width:100%; padding-top: 32%; min-height: 320px; }
+  @media (max-width: 760px){ .windy-frame-wrap{ padding-top:0; height: 420px; min-height:320px; } }
+  .windy-frame-wrap iframe{ position:absolute; inset:0; width:100%; height:100%; border:0; }
+
+  .loading-row{ display:flex; align-items:center; gap:8px; color:var(--text-muted); font-size:12px; padding: 40px 0; justify-content:center; }
+  .spinner{ width:14px; height:14px; border-radius:999px; border:2px solid var(--border); border-top-color: var(--accent); animation: spin 0.8s linear infinite; }
+  @keyframes spin{ to{ transform: rotate(360deg); } }
+
+  /* Custom scrollbars */
+  ::-webkit-scrollbar{ width:8px; height:8px; }
+  ::-webkit-scrollbar-thumb{ background: var(--border); border-radius:6px; }
+  ::-webkit-scrollbar-track{ background: transparent; }
+
+  .leaflet-popup-content-wrapper{ background: var(--panel-2); color: var(--text); border-radius:8px; }
+  .leaflet-popup-content{ font-family: var(--font-body); font-size:12.5px; margin: 8px 10px; }
+  .leaflet-popup-tip{ background: var(--panel-2); }
+  .leaflet-control-zoom a{ background: var(--panel-2) !important; color: var(--text) !important; border-color: var(--border) !important; }
+
+  /* Cluster bubbles matching dashboard theme */
+  .temp-cluster{
+    background: rgba(53,208,244,0.22);
+    border: 2px solid var(--accent);
+    border-radius: 10px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    font-family: var(--font-mono); font-weight:700; color:#eafcff;
+    width:44px; height:38px;
+    line-height:1.05;
+  }
+  .temp-cluster .n{ font-size:13px; }
+  .temp-cluster .lbl{ font-size:7px; letter-spacing:0.04em; color:#bdeff9; font-weight:600; text-transform:uppercase; }
+  .rain-cluster{
+    background: rgba(36,86,201,0.32);
+    border: 2px solid #3f7fd6;
+    border-radius: 10px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    font-family: var(--font-mono); font-weight:700; color:#eaf1ff;
+    width:44px; height:36px;
+    line-height:1.05;
+  }
+  .rain-cluster .n{ font-size:13px; }
+  .rain-cluster .lbl{ font-size:7px; letter-spacing:0.04em; color:#bcd1ff; font-weight:600; text-transform:uppercase; }
+</style>
 </head>
 <body>
 
-    <h1>Hello World</h1>
+  <!-- App bar -->
+  <div class="app-bar">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0b1220" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M6 16.5A4.5 4.5 0 0 1 7 7.6 6 6 0 0 1 18.5 9a4 4 0 0 1-.5 8H7"/>
+          <path d="M9.5 20.5 8 22M13.5 20.5 12 22M17 19l-1.5 1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div>
+        <h1>HK WEATHER DASHBOARD</h1>
+        <p>Hong Kong Observatory Open Data · live feed</p>
+      </div>
+    </div>
+    <div class="status-cluster">
+      <div class="status-pill"><span class="dot live" id="liveDot"></span> <b id="feedState">Connecting…</b></div>
+      <div class="status-pill">Updated <b id="updateTime" class="mono">—</b></div>
+    </div>
+  </div>
 
+  <div class="shell">
+    <div class="grid-main">
+
+      <!-- ===== LEFT: Temperature Map ===== -->
+      <section class="widget" style="min-height: 560px;">
+        <div class="widget-header">
+          <div class="widget-title"><span class="bar"></span> District Temperature Map</div>
+          <div class="summary-strip">
+            <div class="summary-chip"><span class="lbl">Avg Temp</span><span class="val" id="avgTemp">—<small>°C</small></span></div>
+            <div class="summary-chip"><span class="lbl">Humidity</span><span class="val" id="humidity">—<small>%</small></span></div>
+            <div class="summary-chip"><span class="lbl">Stations</span><span class="val" id="stationCount" style="color:var(--text);">—</span></div>
+          </div>
+        </div>
+        <div class="alert-ticker" id="alertTicker">
+          <span class="ico">⚠</span>
+          <span id="alertText"></span>
+        </div>
+        <div class="map-panel">
+          <div id="tempMap"></div>
+          <div class="legend-card">
+            <div style="font-weight:600;color:var(--text-muted);margin-bottom:6px;">TEMP °C</div>
+            <div class="row"><span class="swatch" style="background:hsl(205,80%,55%)"></span> ≤ 26</div>
+            <div class="row"><span class="swatch" style="background:hsl(120,55%,45%)"></span> 27–29</div>
+            <div class="row"><span class="swatch" style="background:hsl(45,90%,50%)"></span> 30–32</div>
+            <div class="row"><span class="swatch" style="background:hsl(5,85%,50%)"></span> 33+</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== RIGHT: Rainfall Map ===== -->
+      <section class="widget" style="min-height: 560px;">
+        <div class="widget-header">
+          <div class="widget-title"><span class="bar"></span> HK Rainfall Map</div>
+          <div class="widget-sub">18 districts · mm in past hour</div>
+        </div>
+        <div class="map-panel">
+          <div id="rainMap"></div>
+          <div class="legend-card" style="bottom:10px; left:auto; right:10px;">
+            <div style="font-weight:600;color:var(--text-muted);margin-bottom:6px;">RAINFALL (mm, past hr)</div>
+            <div class="row"><span class="swatch" style="background:#26364f"></span> 0 (dry)</div>
+            <div class="row"><span class="swatch" style="background:#3f7fd6"></span> 0–5</div>
+            <div class="row"><span class="swatch" style="background:#2456c9"></span> 5–20</div>
+            <div class="row"><span class="swatch" style="background:#1730a0"></span> 20+</div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- ===== BOTTOM: Full-width Windy interactive weather map ===== -->
+    <section class="widget windy-panel" style="margin-top:14px;">
+      <div class="widget-header">
+        <div class="widget-title"><span class="bar"></span> Interactive Weather Map</div>
+        <div class="widget-sub">Live · windy.com</div>
+      </div>
+      <div class="windy-frame-wrap">
+        <iframe
+          width="100%" height="450"
+          src="https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=default&metricTemp=default&metricWind=default&zoom=5&overlay=wind&product=ecmwf&level=surface&lat=22.34&lon=114.149"
+          frameborder="0" loading="lazy"></iframe>
+      </div>
+    </section>
+
+  </div>
+
+<script>
+  /* =========================================================
+     Hong Kong Observatory Open Data API — Current Weather Report
+     dataType=rhrread. No API key required, CORS-enabled.
+     Provides: temperature.data[] (26 stations), rainfall.data[]
+     (18 official districts, mm in past hour), humidity, warnings.
+     ========================================================= */
+  const HKO_API = "https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=rhrread&lang=en";
+
+  /* ---------- Station & district coordinates ----------
+     HKO's JSON gives names + values only, no lat/lon, so we
+     maintain a lookup table for the temperature stations and
+     the 18 official rainfall districts to plot them on the map. */
+  const STATION_COORDS = {
+    "King's Park": [22.3128, 114.1722],
+    "Hong Kong Observatory": [22.3021, 114.1745],
+    "Wong Chuk Hang": [22.2477, 114.1654],
+    "Ta Kwu Ling": [22.5317, 114.1483],
+    "Lau Fau Shan": [22.4694, 113.9878],
+    "Tai Po": [22.4501, 114.1642],
+    "Sha Tin": [22.3817, 114.1889],
+    "Tuen Mun": [22.3908, 113.9725],
+    "Tseung Kwan O": [22.3076, 114.2696],
+    "Sai Kung": [22.3814, 114.2707],
+    "Cheung Chau": [22.2108, 114.0281],
+    "Chek Lap Kok": [22.3089, 113.9213],
+    "Tsing Yi": [22.3585, 114.1077],
+    "Tsuen Wan Ho Koon": [22.3742, 114.1148],
+    "Tsuen Wan Shing Mun Valley": [22.3813, 114.1264],
+    "Hong Kong Park": [22.2775, 114.1618],
+    "Shau Kei Wan": [22.2792, 114.2288],
+    "Kowloon City": [22.3282, 114.1904],
+    "Happy Valley": [22.2711, 114.1839],
+    "Wong Tai Sin": [22.3419, 114.1953],
+    "Stanley": [22.2192, 114.2151],
+    "Kwun Tong": [22.3120, 114.2260],
+    "Sham Shui Po": [22.3308, 114.1622],
+    "Kai Tak Runway Park": [22.3068, 114.2153],
+    "Yuen Long Park": [22.4453, 114.0225],
+    "Tai Mei Tuk": [22.4728, 114.2286],
+    "Ngong Ping": [22.2570, 113.9068],
+    "Sha Lo Wan": [22.2896, 113.9203],
+    "Sai Kung Sha Tau": [22.4014, 114.3121],
+    "Tates Cairn": [22.3467, 114.2119],
+    "Tsim Bei Tsui": [22.4880, 114.0244],
+    "Kau Sai Chau": [22.3688, 114.3269],
+    "Waglan Island": [22.1826, 114.3040],
+    "Green Island": [22.2811, 114.1256],
+    "Kat O": [22.5453, 114.2288],
+    "Ping Chau": [22.5439, 114.4406],
+    "Sai Wan Ho": [22.2822, 114.2211],
+    "Peng Chau": [22.2900, 114.0400]
+  };
+
+  const DISTRICT_COORDS = {
+    "Central & Western District": [22.2850, 114.1550],
+    "Eastern District": [22.2840, 114.2230],
+    "Southern District": [22.2470, 114.1590],
+    "Wan Chai": [22.2790, 114.1830],
+    "Kowloon City": [22.3282, 114.1904],
+    "Kwun Tong": [22.3120, 114.2260],
+    "Sham Shui Po": [22.3308, 114.1622],
+    "Wong Tai Sin": [22.3419, 114.1953],
+    "Yau Tsim Mong": [22.3200, 114.1700],
+    "Islands District": [22.2610, 113.9460],
+    "Kwai Tsing": [22.3560, 114.1300],
+    "North District": [22.4940, 114.1380],
+    "Sai Kung": [22.3814, 114.2707],
+    "Sha Tin": [22.3817, 114.1889],
+    "Tai Po": [22.4501, 114.1642],
+    "Tsuen Wan": [22.3710, 114.1130],
+    "Tuen Mun": [22.3908, 113.9725],
+    "Yuen Long": [22.4453, 114.0225]
+  };
+
+  /* ---------- Color scales ---------- */
+  function tempColor(t){
+    if (t <= 26) return "hsl(205,80%,55%)";
+    if (t <= 29) return "hsl(120,55%,45%)";
+    if (t <= 32) return "hsl(45,90%,50%)";
+    return "hsl(5,85%,50%)";
+  }
+  function rainColor(mm){
+    if (mm <= 0)  return "#26364f";
+    if (mm < 5)   return "#3f7fd6";
+    if (mm < 20)  return "#2456c9";
+    return "#1730a0";
+  }
+  function rainRadius(mm){
+    return Math.min(30, 9 + Math.sqrt(mm) * 4);
+  }
+
+  /* ---------- Map init ---------- */
+  const DARK_TILES = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+  const TILE_ATTR = "&copy; OpenStreetMap &copy; CARTO";
+
+  const HK_BOUNDS = L.latLngBounds([22.13, 113.83], [22.58, 114.45]);
+
+  const tempMap = L.map("tempMap", { zoomControl: true, attributionControl: false, minZoom: 10.3, maxZoom: 15, maxBounds: HK_BOUNDS.pad(0.15) }).setView([22.28, 114.17], 10.65);
+  L.tileLayer(DARK_TILES, { attribution: TILE_ATTR, maxZoom: 19 }).addTo(tempMap);
+
+  const rainMap = L.map("rainMap", { zoomControl: true, attributionControl: false, minZoom: 10.7, maxZoom: 15, maxBounds: HK_BOUNDS.pad(0.15) }).setView([22.325, 114.16], 11.0);
+  L.tileLayer(DARK_TILES, { attribution: TILE_ATTR, maxZoom: 19 }).addTo(rainMap);
+
+  // Marker clustering keeps dense station clusters (e.g. central Kowloon)
+  // legible by grouping overlapping pins until the user zooms in.
+  let tempLayer = L.markerClusterGroup({
+    maxClusterRadius: 42,
+    spiderfyOnMaxZoom: true,
+    showCoverageOnHover: false,
+    iconCreateFunction: function(cluster){
+      return L.divIcon({
+        html: '<div class="temp-cluster"><span class="n">' + cluster.getChildCount() + '</span><span class="lbl">stations</span></div>',
+        className: '', iconSize: [44,38]
+      });
+    }
+  }).addTo(tempMap);
+  let rainLayer = L.markerClusterGroup({
+    maxClusterRadius: 36,
+    spiderfyOnMaxZoom: true,
+    showCoverageOnHover: false,
+    iconCreateFunction: function(cluster){
+      return L.divIcon({
+        html: '<div class="rain-cluster"><span class="n">' + cluster.getChildCount() + '</span><span class="lbl">areas</span></div>',
+        className: '', iconSize: [44,36]
+      });
+    }
+  }).addTo(rainMap);
+
+  function formatTime(iso){
+    if(!iso) return "—";
+    const d = new Date(iso);
+    return d.toLocaleTimeString("en-HK",{hour:"2-digit",minute:"2-digit"}) + " · " +
+           d.toLocaleDateString("en-HK",{day:"2-digit",month:"short"});
+  }
+
+  function renderTempMarkers(tempData){
+    tempLayer.clearLayers();
+    tempData.forEach(function(s){
+      const coord = STATION_COORDS[s.place];
+      if (!coord) return;
+      const icon = L.divIcon({
+        className: "",
+        html: '<div class="temp-marker" style="background:' + tempColor(s.value) + '"><span>' + Math.round(s.value) + '°</span></div>',
+        iconSize: [36,36], iconAnchor: [18,36], popupAnchor: [0,-34]
+      });
+      L.marker(coord, { icon }).addTo(tempLayer)
+        .bindPopup('<b>' + s.place + '</b><br>' + s.value + '°' + s.unit);
+    });
+  }
+
+  function renderRainMarkers(rainData){
+    rainLayer.clearLayers();
+    rainData.forEach(function(d){
+      const coord = DISTRICT_COORDS[d.place];
+      if (!coord) return;
+      const mm = d.max || 0;
+      const size = Math.round(Math.min(46, 26 + Math.sqrt(mm) * 5));
+      const icon = L.divIcon({
+        className: "",
+        html: '<div class="rain-marker" style="width:' + size + 'px;height:' + size + 'px;background:' + rainColor(mm) + '">' + mm + '</div>',
+        iconSize: [size, size], iconAnchor: [size/2, size/2], popupAnchor: [0, -size/2]
+      });
+      L.marker(coord, { icon }).addTo(rainLayer)
+        .bindPopup('<b>' + d.place + '</b><br>' + mm + ' mm (past hour)');
+    });
+  }
+
+  function renderSummary(data){
+    const temps = data.temperature.data.map(function(s){ return s.value; });
+    const avg = (temps.reduce(function(a,b){ return a+b; },0) / temps.length).toFixed(1);
+    document.getElementById("avgTemp").innerHTML = avg + "<small>°C</small>";
+    document.getElementById("stationCount").textContent = temps.length;
+
+    if (data.humidity && data.humidity.data.length){
+      document.getElementById("humidity").innerHTML = data.humidity.data[0].value + "<small>%</small>";
+    }
+
+    const ticker = document.getElementById("alertTicker");
+    const alertText = document.getElementById("alertText");
+    if (data.warningMessage && data.warningMessage.length && String(data.warningMessage[0]).trim() !== ""){
+      ticker.classList.add("show");
+      alertText.textContent = data.warningMessage.join(" ");
+    } else {
+      ticker.classList.remove("show");
+    }
+
+    document.getElementById("updateTime").textContent = formatTime(data.updateTime);
+  }
+
+  function setFeedState(ok){
+    const dot = document.getElementById("liveDot");
+    const label = document.getElementById("feedState");
+    if (ok){
+      dot.style.background = "#37d67a";
+      label.textContent = "Live";
+    } else {
+      dot.style.background = "#ff5470";
+      dot.classList.remove("live");
+      label.textContent = "Feed error";
+    }
+  }
+
+  async function loadWeather(){
+    try{
+      const res = await fetch(HKO_API);
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+
+      renderTempMarkers(data.temperature.data);
+      renderRainMarkers(data.rainfall.data);
+      renderSummary(data);
+      setFeedState(true);
+    } catch (err){
+      console.error("HKO fetch error:", err);
+      setFeedState(false);
+    }
+  }
+
+  // Ensure Leaflet renders correctly once layout settles, then load data
+  window.addEventListener("load", function(){
+    setTimeout(function(){
+      tempMap.invalidateSize();
+      rainMap.invalidateSize();
+    }, 150);
+  });
+
+  loadWeather();
+  setInterval(loadWeather, 5 * 60 * 1000); // HKO updates hourly; poll every 5 min
+</script>
 </body>
 </html>
