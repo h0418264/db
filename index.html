@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>HK Weather</title>
-<meta name="description" content="Live Hong Kong weather operations dashboard: district temperatures, rainfall map, and an interactive wind map, sourced from the Hong Kong Observatory Open Data API." />
+<title>Hong Kong Weather</title>
+<meta name="description" content="Live Hong Kong weather dashboard: interactive wind map, district temperatures, and rainfall, sourced from the Hong Kong Observatory Open Data API." />
 
 <!-- Tailwind CSS via CDN -->
 <script src="https://cdn.tailwindcss.com"></script>
@@ -37,25 +37,33 @@
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
+  html{ height:100%; }
   body{
     background: radial-gradient(circle at top left, #101c34 0%, var(--bg) 55%);
     color: var(--text);
     font-family: var(--font-body);
-    min-height: 100vh;
+    height:100%;
+    overflow:hidden; /* strict no-scroll desktop */
     -webkit-font-smoothing: antialiased;
+    display:flex; flex-direction:column;
   }
   .mono{font-family: var(--font-mono);}
+
+  @media (max-width: 1023px){
+    html,body{ height:auto; overflow:auto; } /* normal scrolling on mobile/tablet */
+  }
 
   /* ---------- App bar ---------- */
   .app-bar{
     display:flex; align-items:center; justify-content:space-between;
     gap: 12px;
-    padding: 14px 20px;
+    padding: 9px 18px;
     border-bottom: 1px solid var(--border-soft);
     background: rgba(11,18,32,0.85);
     backdrop-filter: blur(8px);
     position: sticky; top:0; z-index: 40;
     flex-wrap: wrap;
+    flex-shrink:0;
   }
   .brand{ display:flex; align-items:center; gap:10px; min-width:0; }
   .brand-mark{
@@ -66,14 +74,14 @@
     box-shadow: 0 0 0 1px rgba(255,255,255,0.08) inset, 0 4px 14px rgba(53,208,244,0.25);
   }
   .brand h1{
-    font-size: 15px;
+    font-size: 13.5px;
     font-weight: 700;
     letter-spacing: 0.02em;
     line-height:1.1;
     white-space: nowrap;
   }
   .brand h1 span{ color: var(--accent); }
-  .brand p{ font-size: 11px; color: var(--text-muted); margin-top:2px; letter-spacing:0.04em; white-space:nowrap; }
+  .brand p{ font-size: 10px; color: var(--text-muted); margin-top:1px; letter-spacing:0.04em; white-space:nowrap; }
 
   .status-cluster{ display:flex; align-items:center; gap:16px; flex-wrap:wrap; justify-content:flex-end; }
 
@@ -86,9 +94,9 @@
   }
   .status-pill{
     display:flex; align-items:center; gap:7px;
-    font-size:11px; color: var(--text-muted);
+    font-size:10.5px; color: var(--text-muted);
     background: var(--panel-2); border:1px solid var(--border);
-    padding: 6px 10px; border-radius: 999px;
+    padding: 5px 9px; border-radius: 999px;
     white-space: nowrap;
   }
   .status-pill b{ color: var(--text); font-weight:600; letter-spacing: 0.02em; }
@@ -97,14 +105,29 @@
   @keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:.35;} }
 
   /* ---------- Layout ---------- */
-  .shell{ padding: 14px 16px 20px; max-width: 1600px; margin: 0 auto; }
+  .shell{
+    padding: 10px 14px 12px;
+    max-width: 1600px; margin: 0 auto;
+    flex: 1;
+    display:flex; flex-direction:column;
+    min-height:0; /* allow children to shrink instead of overflowing */
+  }
   .grid-main{
     display:grid;
     grid-template-columns: 1fr;
-    gap: 14px;
+    gap: 10px;
   }
   @media (min-width: 1024px){
-    .grid-main{ grid-template-columns: 1.15fr 1fr; align-items: stretch; }
+    .shell{ flex:1; min-height:0; }
+    /* Windy is the large primary panel; temp+rainfall stack as a narrow secondary column */
+    .grid-main{ grid-template-columns: 2.35fr 1fr; align-items: stretch; flex: 1 1 auto; min-height:0; }
+    .secondary-col{ display:flex; flex-direction:column; gap:10px; min-height:0; }
+    .secondary-col .widget{ flex:1; min-height:0; }
+    .windy-panel{ min-height:0; }
+  }
+  @media (max-width: 1023px){
+    .shell{ display:block; }
+    .secondary-col{ display:flex; flex-direction:column; gap:10px; }
   }
 
   .widget{
@@ -116,38 +139,41 @@
     box-shadow: 0 1px 0 rgba(255,255,255,0.02) inset, 0 12px 24px -12px rgba(0,0,0,0.5);
   }
   .widget-header{
-    display:flex; align-items:center; justify-content:space-between; gap:10px;
-    padding: 12px 16px;
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    padding: 8px 12px;
     border-bottom: 1px solid var(--border-soft);
     flex-wrap: wrap;
+    flex-shrink:0;
   }
   .widget-title{
-    display:flex; align-items:center; gap:9px;
-    font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em;
+    display:flex; align-items:center; gap:7px;
+    font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.07em;
     color: var(--text-muted);
   }
-  .widget-title .bar{ width:3px; height:14px; border-radius:2px; background: var(--accent); }
+  .widget-title .bar{ width:3px; height:12px; border-radius:2px; background: var(--accent); }
   .widget-title.warn .bar{ background: var(--accent-warn); }
-  .widget-sub{ font-size:11px; color: var(--text-faint); }
+  .widget-sub{ font-size:10.5px; color: var(--text-faint); }
 
   /* ---------- Map panels (temperature + rainfall) ---------- */
-  .map-panel{ position:relative; flex:1; min-height: 400px; }
+  .map-panel{ position:relative; flex:1; min-height: 160px; }
+  @media (min-width: 1024px){ .map-panel{ min-height:0; } }
   #tempMap, #rainMap{ position:absolute; top:0; left:0; right:0; bottom:0; background:#0d1524; }
   .leaflet-container{ font-family: var(--font-body); background:#0d1524 !important; }
 
   .legend-card{
-    position:absolute; bottom:10px; left:10px; z-index:500;
+    position:absolute; bottom:8px; left:8px; z-index:500;
     background: rgba(11,18,32,0.88);
     border:1px solid var(--border);
-    border-radius:10px;
-    padding: 8px 10px;
-    font-size:10.5px;
+    border-radius:9px;
+    padding: 6px 8px;
+    font-size:9.5px;
     color: var(--text-muted);
     backdrop-filter: blur(6px);
+    line-height:1.3;
   }
-  .legend-card .row{ display:flex; align-items:center; gap:6px; margin-top:4px; }
+  .legend-card .row{ display:flex; align-items:center; gap:5px; margin-top:3px; }
   .legend-card .row:first-child{ margin-top:0; }
-  .swatch{ width:11px; height:11px; border-radius:3px; flex-shrink:0; }
+  .swatch{ width:9px; height:9px; border-radius:3px; flex-shrink:0; }
 
   .temp-marker{
     display:flex; align-items:center; justify-content:center;
@@ -171,36 +197,41 @@
   }
 
   /* ---------- Summary strip inside temp panel header ---------- */
-  .summary-strip{ display:flex; gap:10px; flex-wrap:wrap; }
+  .summary-strip{ display:flex; gap:6px; flex-wrap:wrap; }
   .summary-chip{
     display:flex; flex-direction:column; align-items:flex-start;
     background: var(--panel-2); border:1px solid var(--border);
-    border-radius:9px; padding:6px 10px; min-width:74px;
+    border-radius:8px; padding:4px 8px; min-width:60px;
   }
-  .summary-chip .lbl{ font-size:9.5px; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.06em; }
-  .summary-chip .val{ font-family: var(--font-mono); font-size:15px; font-weight:700; color: var(--accent); }
-  .summary-chip .val small{ font-size:10px; color: var(--text-muted); font-weight:500; }
+  .summary-chip .lbl{ font-size:8.5px; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.05em; }
+  .summary-chip .val{ font-family: var(--font-mono); font-size:13px; font-weight:700; color: var(--accent); }
+  .summary-chip .val small{ font-size:9px; color: var(--text-muted); font-weight:500; }
 
   /* ---------- Alert ticker (compact, inside temp header) ---------- */
   .alert-ticker{
-    margin: 0 16px 12px;
+    margin: 0 12px 8px;
     background: rgba(255,84,112,0.08);
     border: 1px solid rgba(255,84,112,0.35);
-    border-radius: 9px;
-    padding: 9px 12px;
-    font-size: 12px;
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 11px;
     color: #ffb4c2;
-    line-height: 1.5;
+    line-height: 1.4;
     display:none;
+    flex-shrink:0;
   }
-  .alert-ticker.show{ display:flex; gap:8px; align-items:flex-start; }
+  .alert-ticker.show{ display:flex; gap:7px; align-items:flex-start; }
   .alert-ticker .ico{ flex-shrink:0; margin-top:1px; }
 
-  /* ---------- Bottom Windy panel ---------- */
-  .windy-panel{ position:relative; width:100%; }
-  .windy-frame-wrap{ position:relative; width:100%; padding-top: 32%; min-height: 320px; }
-  @media (max-width: 760px){ .windy-frame-wrap{ padding-top:0; height: 420px; min-height:320px; } }
+  /* ---------- Windy panel: large primary focus ---------- */
+  .windy-panel{ position:relative; width:100%; display:flex; flex-direction:column; }
+  .windy-frame-wrap{ position:relative; width:100%; padding-top: 62%; min-height: 320px; flex:1; }
+  @media (max-width: 1023px){ .windy-frame-wrap{ padding-top:0; height: 460px; min-height:320px; } }
   .windy-frame-wrap iframe{ position:absolute; inset:0; width:100%; height:100%; border:0; }
+
+  @media (min-width: 1024px){
+    .windy-frame-wrap{ padding-top:0; height:auto; min-height:0; flex:1; }
+  }
 
   .loading-row{ display:flex; align-items:center; gap:8px; color:var(--text-muted); font-size:12px; padding: 40px 0; justify-content:center; }
   .spinner{ width:14px; height:14px; border-radius:999px; border:2px solid var(--border); border-top-color: var(--accent); animation: spin 0.8s linear infinite; }
@@ -253,7 +284,7 @@
         </svg>
       </div>
       <div>
-        <h1>HK WEATHER DASHBOARD</h1>
+        <h1>HONG KONG <span>WEATHER</span></h1>
         <p>Hong Kong Observatory Open Data · live feed</p>
       </div>
     </div>
@@ -266,66 +297,66 @@
   <div class="shell">
     <div class="grid-main">
 
-      <!-- ===== LEFT: Temperature Map ===== -->
-      <section class="widget" style="min-height: 560px;">
+      <!-- ===== PRIMARY: Interactive Windy weather map (large focus) ===== -->
+      <section class="widget windy-panel">
         <div class="widget-header">
-          <div class="widget-title"><span class="bar"></span>Temperature Map</div>
-          <div class="summary-strip">
-            <div class="summary-chip"><span class="lbl">Avg Temp</span><span class="val" id="avgTemp">—<small>°C</small></span></div>
-            <div class="summary-chip"><span class="lbl">Humidity</span><span class="val" id="humidity">—<small>%</small></span></div>
-            <div class="summary-chip"><span class="lbl">Stations</span><span class="val" id="stationCount" style="color:var(--text);">—</span></div>
-          </div>
+          <div class="widget-title"><span class="bar"></span> Interactive Weather Map</div>
+          <div class="widget-sub">Live · windy.com</div>
         </div>
-        <div class="alert-ticker" id="alertTicker">
-          <span class="ico">⚠</span>
-          <span id="alertText"></span>
-        </div>
-        <div class="map-panel">
-          <div id="tempMap"></div>
-          <div class="legend-card">
-            <div style="font-weight:600;color:var(--text-muted);margin-bottom:6px;">TEMP °C</div>
-            <div class="row"><span class="swatch" style="background:hsl(205,80%,55%)"></span> ≤ 26</div>
-            <div class="row"><span class="swatch" style="background:hsl(120,55%,45%)"></span> 27–29</div>
-            <div class="row"><span class="swatch" style="background:hsl(45,90%,50%)"></span> 30–32</div>
-            <div class="row"><span class="swatch" style="background:hsl(5,85%,50%)"></span> 33+</div>
-          </div>
+        <div class="windy-frame-wrap">
+          <iframe
+            width="100%" height="450"
+            src="https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=default&metricTemp=default&metricWind=default&zoom=5&overlay=wind&product=ecmwf&level=surface&lat=22.34&lon=114.149"
+            frameborder="0" loading="lazy"></iframe>
         </div>
       </section>
 
-      <!-- ===== RIGHT: Rainfall Map ===== -->
-      <section class="widget" style="min-height: 560px;">
-        <div class="widget-header">
-          <div class="widget-title"><span class="bar"></span>Rainfall Map</div>
-          <div class="widget-sub">18 districts · mm in past hour</div>
-        </div>
-        <div class="map-panel">
-          <div id="rainMap"></div>
-          <div class="legend-card" style="bottom:10px; left:auto; right:10px;">
-            <div style="font-weight:600;color:var(--text-muted);margin-bottom:6px;">RAINFALL (mm, past hr)</div>
-            <div class="row"><span class="swatch" style="background:#26364f"></span> 0 (dry)</div>
-            <div class="row"><span class="swatch" style="background:#3f7fd6"></span> 0–5</div>
-            <div class="row"><span class="swatch" style="background:#2456c9"></span> 5–20</div>
-            <div class="row"><span class="swatch" style="background:#1730a0"></span> 20+</div>
+      <!-- ===== SECONDARY: Temperature + Rainfall (compact stacked column) ===== -->
+      <div class="secondary-col">
+        <section class="widget" style="min-height: 200px;">
+          <div class="widget-header">
+            <div class="widget-title"><span class="bar"></span> Temperature</div>
+            <div class="summary-strip">
+              <div class="summary-chip"><span class="lbl">Avg</span><span class="val" id="avgTemp">—<small>°C</small></span></div>
+              <div class="summary-chip"><span class="lbl">Humidity</span><span class="val" id="humidity">—<small>%</small></span></div>
+              <div class="summary-chip"><span class="lbl">Stations</span><span class="val" id="stationCount" style="color:var(--text);">—</span></div>
+            </div>
           </div>
-        </div>
-      </section>
+          <div class="alert-ticker" id="alertTicker">
+            <span class="ico">⚠</span>
+            <span id="alertText"></span>
+          </div>
+          <div class="map-panel">
+            <div id="tempMap"></div>
+            <div class="legend-card">
+              <div style="font-weight:600;color:var(--text-muted);margin-bottom:6px;">TEMP °C</div>
+              <div class="row"><span class="swatch" style="background:hsl(205,80%,55%)"></span> ≤ 26</div>
+              <div class="row"><span class="swatch" style="background:hsl(120,55%,45%)"></span> 27–29</div>
+              <div class="row"><span class="swatch" style="background:hsl(45,90%,50%)"></span> 30–32</div>
+              <div class="row"><span class="swatch" style="background:hsl(5,85%,50%)"></span> 33+</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="widget" style="min-height: 160px;">
+          <div class="widget-header">
+            <div class="widget-title"><span class="bar"></span> Rainfall</div>
+            <div class="widget-sub">18 districts · mm/hr</div>
+          </div>
+          <div class="map-panel">
+            <div id="rainMap"></div>
+            <div class="legend-card" style="bottom:10px; left:auto; right:10px;">
+              <div style="font-weight:600;color:var(--text-muted);margin-bottom:6px;">RAINFALL (mm, past hr)</div>
+              <div class="row"><span class="swatch" style="background:#26364f"></span> 0 (dry)</div>
+              <div class="row"><span class="swatch" style="background:#3f7fd6"></span> 0–5</div>
+              <div class="row"><span class="swatch" style="background:#2456c9"></span> 5–20</div>
+              <div class="row"><span class="swatch" style="background:#1730a0"></span> 20+</div>
+            </div>
+          </div>
+        </section>
+      </div>
 
     </div>
-
-    <!-- ===== BOTTOM: Full-width Windy interactive weather map ===== -->
-    <section class="widget windy-panel" style="margin-top:14px;">
-      <div class="widget-header">
-        <div class="widget-title"><span class="bar"></span> Interactive Weather Map</div>
-        <div class="widget-sub">Live · windy.com</div>
-      </div>
-      <div class="windy-frame-wrap">
-        <iframe
-          width="100%" height="450"
-          src="https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=default&metricTemp=default&metricWind=default&zoom=5&overlay=wind&product=ecmwf&level=surface&lat=22.34&lon=114.149"
-          frameborder="0" loading="lazy"></iframe>
-      </div>
-    </section>
-
   </div>
 
 <script>
@@ -426,10 +457,12 @@
 
   const HK_BOUNDS = L.latLngBounds([22.13, 113.83], [22.58, 114.45]);
 
-  const tempMap = L.map("tempMap", { zoomControl: true, attributionControl: false, minZoom: 10.3, maxZoom: 15, maxBounds: HK_BOUNDS.pad(0.15) }).setView([22.28, 114.17], 10.65);
+  // Secondary panels are now compact, so default to a territory-wide view
+  // that shows all stations/districts at a glance. Users can still zoom/pan.
+  const tempMap = L.map("tempMap", { zoomControl: true, attributionControl: false, minZoom: 10.0, maxZoom: 16, maxBounds: HK_BOUNDS.pad(0.15) }).setView([22.29, 114.16], 10.2);
   L.tileLayer(DARK_TILES, { attribution: TILE_ATTR, maxZoom: 19 }).addTo(tempMap);
 
-  const rainMap = L.map("rainMap", { zoomControl: true, attributionControl: false, minZoom: 10.7, maxZoom: 15, maxBounds: HK_BOUNDS.pad(0.15) }).setView([22.325, 114.16], 11.0);
+  const rainMap = L.map("rainMap", { zoomControl: true, attributionControl: false, minZoom: 10.0, maxZoom: 16, maxBounds: HK_BOUNDS.pad(0.15) }).setView([22.29, 114.16], 10.2);
   L.tileLayer(DARK_TILES, { attribution: TILE_ATTR, maxZoom: 19 }).addTo(rainMap);
 
   // Marker clustering keeps dense station clusters (e.g. central Kowloon)
